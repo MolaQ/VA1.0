@@ -60,6 +60,12 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--at", type=float, nargs="+", default=[600.0, 1500.0, 3000.0])
     t.add_argument("--workdir", default="work")
 
+    f = sub.add_parser("serve-frames", help="save frames of our serves (material for recognising the server's number)")
+    f.add_argument("--video"), f.add_argument("--url")
+    f.add_argument("--calibration", default="calibration.json")
+    f.add_argument("--count", type=int, default=40)
+    f.add_argument("--workdir", default="work")
+
     s = sub.add_parser("serve", help="run as a service that VVA sends matches to")
     s.add_argument("--host", default="127.0.0.1"), s.add_argument("--port", type=int, default=8765)
     s.add_argument("--calibration", default="calibration.json")
@@ -124,6 +130,32 @@ def main(argv: list[str] | None = None) -> int:
             for name, box in (("first", cal.score_left), ("second", cal.score_right)):
                 cv2.imwrite(str(workdir / f"score_{int(t)}_{name}.png"), crop(frame, box))
             print(f"{int(t)} s: pierwsza={r.left} druga={r.right}  (wycinki: {workdir}\\score_{int(t)}_*.png)")
+        return 0
+
+    if args.cmd == "serve-frames":
+        import cv2
+
+        from . import video as vid
+        from .pipeline import Job
+        cal = Calibration.load(args.calibration) if Path(args.calibration).exists() else Calibration()
+        path = _video(args, workdir)
+        job = Job(cal, Settings(), workdir)
+        result = job.run(path)
+        out = workdir / "serves"
+        out.mkdir(exist_ok=True)
+        ours = [r for r in result["rallies"] if r["server"] == "us" and r["start"] is not None][: args.count]
+        for r in ours:
+            first = next((o for o in job.obs if o.t >= r["start"]), None)
+            for dt, tag in ((-1.0, "a"), (0.0, "b")):
+                frame = vid.frame_at(path, max(0.0, r["start"] + dt))
+                name = f"set{r['set']}_r{r['rally']:02d}_{tag}"
+                cv2.imwrite(str(out / f"{name}.jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                if first is not None:
+                    h, w = frame.shape[:2]
+                    x0, x1 = int(max(0, (first.x - 0.06) * w)), int(min(w, (first.x + 0.06) * w))
+                    y0, y1 = int(max(0, (first.y - 0.05) * h)), int(min(h, (first.y + 0.25) * h))
+                    cv2.imwrite(str(out / f"{name}_crop.png"), frame[y0:y1, x0:x1])
+        print(f"Zapisano {len(ours)} zagrywek do {out} (klatka 1 s przed i w chwili zagrywki, plus wycinek wokol pilki).")
         return 0
 
     if args.cmd == "serve":
