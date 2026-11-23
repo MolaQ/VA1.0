@@ -71,15 +71,52 @@ def run(frame, existing: Calibration | None = None) -> Calibration:
         cal.court_ref = "attack"
     cal.our_side_set1 = "near"  # the half of points 1-2 is "near" by definition
 
-    for attr, label in (("score_left", "points of the FIRST team on the overlay (left or top row)"),
-                        ("score_right", "points of the SECOND team on the overlay (right or bottom row)")):
-        print(f"Draw a box around the {label}, then Enter (Esc = no overlay)")
-        x, y, bw, bh = cv2.selectROI(win, frame, showCrosshair=False)
-        if bw and bh:
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+    for attr, label in (("score_left", "Drag a box around the POINTS of the FIRST team (left or top row)"),
+                        ("score_right", "Drag a box around the POINTS of the SECOND team (right or bottom row)")):
+        box = _select_box(frame, label)
+        if box:
+            x, y, bw, bh = box
             setattr(cal, attr, (x / w, y / h, bw / w, bh / h))
     cv2.destroyAllWindows()
+    print("Pola wyniku zaznaczone." if cal.has_scoreboard else "UWAGA: pola wyniku NIE zostały zaznaczone (bez nich nie będzie setów).")
 
     if cal.has_scoreboard:
         answer = input("Is OUR team the first (left/top) or second (right/bottom) on the overlay? [l/r] ").strip().lower()
         cal.our_score = "right" if answer.startswith("r") else "left"
     return cal
+
+
+def _select_box(frame, label: str) -> tuple[int, int, int, int] | None:
+    """Drag a rectangle; Enter accepts (only once a box is drawn), Esc skips."""
+    import cv2
+
+    win = "VVA score overlay"
+    h, w = frame.shape[:2]
+    state: dict = {"start": None, "box": None, "down": False}
+
+    def on_mouse(event, x, y, *_):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            state.update(start=(x, y), down=True, box=None)
+        elif event == cv2.EVENT_MOUSEMOVE and state["down"]:
+            x0, y0 = state["start"]
+            state["box"] = (min(x0, x), min(y0, y), abs(x - x0), abs(y - y0))
+        elif event == cv2.EVENT_LBUTTONUP:
+            state["down"] = False
+
+    cv2.namedWindow(win, cv2.WINDOW_NORMAL)
+    cv2.setMouseCallback(win, on_mouse)
+    while True:
+        view = frame.copy()
+        if state["box"]:
+            x, y, bw, bh = state["box"]
+            cv2.rectangle(view, (x, y), (x + bw, y + bh), (0, 255, 0), 2)
+        cv2.rectangle(view, (0, h - 56), (w, h), (0, 0, 0), -1)
+        cv2.putText(view, label + "  |  Enter = OK, Esc = skip", (16, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.imshow(win, view)
+        key = cv2.waitKey(20) & 0xFF
+        if key in (13, 10) and state["box"] and state["box"][2] > 3 and state["box"][3] > 3:
+            return state["box"]
+        if key == 27:
+            return None

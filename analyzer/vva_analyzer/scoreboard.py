@@ -80,11 +80,14 @@ class OcrReader:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         scale = max(1.0, 64 / max(1, gray.shape[0]))
         gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-        texts = self.reader.readtext(gray, allowlist="0123456789", detail=0)
-        digits = "".join(texts).strip()
-        if not digits or len(digits) > 2:
-            return None
-        return int(digits)
+        gray = cv2.copyMakeBorder(gray, 12, 12, 12, 12, cv2.BORDER_REPLICATE)
+        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        for img in (gray, binary):
+            texts = self.reader.readtext(img, allowlist="0123456789", detail=0, paragraph=False)
+            digits = "".join(texts).strip()
+            if digits and len(digits) <= 2:
+                return int(digits)
+        return None
 
     def read(self, t: float, frame, cal: Calibration) -> Reading:
         assert cal.score_left and cal.score_right

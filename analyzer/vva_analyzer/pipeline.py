@@ -39,13 +39,16 @@ class Job:
             except Exception as e:  # progress is best effort
                 log.warning("progress not sent: %s", e)
 
-    def run(self, video: Path, reuse: bool = True) -> dict:
+    def run(self, video: Path, reuse: bool = True, rescore: bool = False) -> dict:
         from . import video as vid
 
         cache = self.workdir / f"{video.stem}.detections.json"
         if reuse and cache.exists():
             self._load(cache)
             self.progress(85, "Używam zapisanych wykryć")
+            if self.cal.has_scoreboard and (rescore or not self.readings):
+                self._read_scores(video, vid)
+                self._save(cache)
         else:
             self._scan(video, vid)
             self._save(cache)
@@ -116,6 +119,22 @@ class Job:
         if batch:
             flush()
 
+    def _read_scores(self, video: Path, vid) -> None:
+        """Only the score overlay, once per second (minutes instead of a full scan)."""
+        from .scoreboard import OcrReader
+
+        _, _, _, duration = vid.info(video)
+        ocr = OcrReader(gpu=self.device not in (None, "cpu"))
+        self.readings = []
+        last = -1
+        for t, frame in vid.frames(video, 1.0 / self.s.ocr_every_s):
+            self.readings.append(ocr.read(t, frame, self.cal))
+            pct = int(100 * t / duration) if duration else 0
+            if pct // 5 != last:
+                last = pct // 5
+                ok = sum(1 for r in self.readings if r.left is not None and r.right is not None)
+                self.on_progress(pct, f"Odczyt wyniku: {int(t // 60)} min, udane odczyty {ok}/{len(self.readings)}")
+
     def analyse(self) -> dict:
         s = self.s
         candidates = ral.rally_candidates(ral.activity(ral.drop_static(self.obs, s), s), s)
@@ -127,6 +146,8 @@ class Job:
             "rallies": act.report(rallies),
             "actions": act.serve_actions(rallies),
             "stats": {
+                "score_reads_ok": sum(1 for r in self.readings if r.left is not None and r.right is not None),
+                "score_reads": len(self.readings),
                 "ball_detections": len(self.obs),
                 "plays": len(candidates),
                 "score_changes": len(scores),

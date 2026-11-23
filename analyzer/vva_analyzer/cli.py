@@ -51,7 +51,14 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--fps", type=float, help="frames per second to analyse (default 12)")
     a.add_argument("--model", help="YOLO weights (default yolo11s.pt, downloaded automatically)")
     a.add_argument("--fresh", action="store_true", help="ignore saved detections and scan the video again")
+    a.add_argument("--rescore", action="store_true", help="read the score overlay again (keeps the ball detections)")
     a.add_argument("--workdir", default="work")
+
+    t = sub.add_parser("score-test", help="check the score overlay boxes: saves the crops and prints what OCR reads")
+    t.add_argument("--video"), t.add_argument("--url")
+    t.add_argument("--calibration", default="calibration.json")
+    t.add_argument("--at", type=float, nargs="+", default=[600.0, 1500.0, 3000.0])
+    t.add_argument("--workdir", default="work")
 
     s = sub.add_parser("serve", help="run as a service that VVA sends matches to")
     s.add_argument("--host", default="127.0.0.1"), s.add_argument("--port", type=int, default=8765)
@@ -93,8 +100,30 @@ def main(argv: list[str] | None = None) -> int:
             client = VvaClient(args.api, args.token)
             client.purge_ai(args.game)
         path = _video(args, workdir)
-        result = Job(cal, settings, workdir, client, args.game, _device(args.device)).run(path, reuse=not args.fresh)
+        result = Job(cal, settings, workdir, client, args.game, _device(args.device)).run(
+            path, reuse=not args.fresh, rescore=args.rescore)
         print(json.dumps({"sets": result["sets"], **result["stats"]}, indent=2))
+        return 0
+
+    if args.cmd == "score-test":
+        import cv2
+
+        from . import video as vid
+        from .scoreboard import OcrReader, crop
+        if not Path(args.calibration).exists():
+            raise SystemExit(f"Brak pliku {args.calibration}: najpierw `calibrate`.")
+        cal = Calibration.load(args.calibration)
+        print(f"Pola wyniku w kalibracji: pierwsza={cal.score_left} druga={cal.score_right}, nasza={cal.our_score}")
+        if not cal.has_scoreboard:
+            raise SystemExit("Kalibracja nie ma zaznaczonych pól wyniku: uruchom `calibrate` jeszcze raz i zaznacz oba prostokąty.")
+        path = _video(args, workdir)
+        ocr = OcrReader(gpu=_device(None) not in (None, "cpu"))
+        for t in args.at:
+            frame = vid.frame_at(path, t)
+            r = ocr.read(t, frame, cal)
+            for name, box in (("first", cal.score_left), ("second", cal.score_right)):
+                cv2.imwrite(str(workdir / f"score_{int(t)}_{name}.png"), crop(frame, box))
+            print(f"{int(t)} s: pierwsza={r.left} druga={r.right}  (wycinki: {workdir}\\score_{int(t)}_*.png)")
         return 0
 
     if args.cmd == "serve":
