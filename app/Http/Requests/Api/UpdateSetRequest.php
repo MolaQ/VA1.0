@@ -26,6 +26,7 @@ class UpdateSetRequest extends FormRequest
             'score_us' => ['sometimes', 'integer', 'between:0,99'],
             'score_them' => ['sometimes', 'integer', 'between:0,99'],
             'video_start' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'our_side' => ['sometimes', 'nullable', 'in:near,far'],
             'lineup' => ['sometimes', 'array', 'max:14'],
             'lineup.*.player_id' => ['nullable', 'integer', 'required_without:lineup.*.player_number'],
             'lineup.*.player_number' => ['nullable', 'integer', 'between:0,99'],

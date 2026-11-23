@@ -37,6 +37,11 @@ class StoreActionsRequest extends FormRequest
             'actions.*.video_time' => ['nullable', 'numeric', 'min:0', 'max:86400'],
             'actions.*.zone_from' => ['nullable', 'integer', 'between:1,9'],
             'actions.*.zone_to' => ['nullable', 'integer', 'between:1,9'],
+            // ball points in metres, our team's frame (x 0..9 facing the net, y 0 own end line, 9 net)
+            'actions.*.from_x' => ['nullable', 'numeric', 'between:-4,13'],
+            'actions.*.from_y' => ['nullable', 'numeric', 'between:-6,24'],
+            'actions.*.to_x' => ['nullable', 'numeric', 'between:-4,13'],
+            'actions.*.to_y' => ['nullable', 'numeric', 'between:-6,24'],
             'actions.*.confidence' => ['nullable', 'numeric', 'between:0,1'],
             'actions.*.meta' => ['nullable', 'array'],
             'actions.*.needs_review' => ['nullable', 'boolean'],

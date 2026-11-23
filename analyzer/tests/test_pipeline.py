@@ -13,8 +13,11 @@ class FakeClient:
     def progress(self, game_id, status, progress=None, message=None):
         self.calls.append(("progress", status, progress))
 
-    def put_set(self, game_id, number, us, them, video_start):
+    def put_set(self, game_id, number, us, them, video_start, our_side=None):
         self.calls.append(("set", number, us, them))
+
+    def post_frames(self, game_id, frames):
+        self.calls.append(("frames", len(frames)))
 
     def post_actions(self, game_id, actions):
         self.calls.append(("actions", len(actions)))

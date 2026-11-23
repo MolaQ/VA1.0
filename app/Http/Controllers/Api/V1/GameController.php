@@ -45,7 +45,7 @@ class GameController extends Controller
                 'progress' => $game->analysis_progress,
             ],
             'sets' => $game->sets->map(fn (GameSet $set) => [
-                ...$set->only(['number', 'score_us', 'score_them', 'video_start', 'we_serve_first']),
+                ...$set->only(['number', 'score_us', 'score_them', 'video_start', 'we_serve_first', 'our_side']),
                 // starting rotation: position 1 (serves first) .. 6
                 'lineup' => $set->lineups->whereNotNull('rotation_position')->sortBy('rotation_position')
                     ->map(fn (SetLineup $l) => [

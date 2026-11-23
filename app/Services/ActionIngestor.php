@@ -83,6 +83,14 @@ class ActionIngestor
                     'review_note' => Arr::get($item, 'review_note'),
                 ];
 
+                // Ball points (our team's frame, metres): only when sent, so a resend without
+                // them keeps the points the analyst marked on the 2D court.
+                foreach (['from_x', 'from_y', 'to_x', 'to_y'] as $key) {
+                    if (Arr::has($item, $key)) {
+                        $attributes[$key] = Arr::get($item, $key);
+                    }
+                }
+
                 $externalId = Arr::get($item, 'external_id');
 
                 if ($externalId !== null) {

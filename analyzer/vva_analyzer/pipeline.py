@@ -12,6 +12,7 @@ from . import actions as act
 from . import rallies as ral
 from .api import VvaClient
 from .config import Calibration, Settings
+from .players import Person, build_frames
 from .scoreboard import Reading, is_replay, replay_spans, stabilise
 
 log = logging.getLogger("vva")
@@ -31,6 +32,8 @@ class Job:
         self.readings: list[Reading] = []
         self.replay_checked = True  # False for caches made before replays were detected
         self.whistles: list[float] = []
+        # people (feet points, normalised image coords) every positions_every_s, for the 2D court view
+        self.people: list[tuple[float, list[Person]]] = []
 
     # ------------------------------------------------------------------ steps
 
@@ -90,11 +93,16 @@ class Job:
 
         batch, times = [], []
         next_ocr = 0.0
+        want_people = self.s.players and self.cal.has_court
+        next_pos = [0.0]
         last_pct = -1
         last_publish = 0
 
         def flush():
-            for t, found in zip(times, detector.detect(batch)):
+            for t, (found, persons) in zip(times, detector.detect_all(batch, people=want_people)):
+                if want_people and t >= next_pos[0]:
+                    self.people.append((t, [Person(x, y, c) for x, y, c in persons]))
+                    next_pos[0] = t + self.s.positions_every_s
                 if found is None:
                     continue
                 x, y, conf = found
@@ -163,10 +171,12 @@ class Job:
         scores = stabilise(self.readings, self.cal, s)
         rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1, self.first_serve)
         numbered = ral.assign_servers(rallies, self.lineups)
+        frames = self.player_frames(sets, spans)
         return {
             "sets": [asdict(x) for x in sets],
             "rallies": act.report(rallies),
             "actions": act.serve_actions(rallies),
+            "frames": frames,
             "stats": {
                 "score_reads_ok": sum(1 for r in self.readings if r.left is not None and r.right is not None),
                 "score_reads": len(self.readings),
@@ -178,18 +188,35 @@ class Job:
                 "rallies": len(rallies),
                 "serves_with_player": numbered,
                 "rallies_with_video_time": sum(1 for r in rallies if r.start is not None),
+                "position_frames": len(frames),
             },
         }
+
+    def player_frames(self, sets, replays) -> list[dict]:
+        """Player positions in court metres for the 2D view (needs the court calibration)."""
+        if not self.cal.has_court or not self.people:
+            return []
+        from .court import homography
+
+        h = homography(self.cal.court, 1, 1, self.cal.court_ref)
+        starts = [(x.number, x.video_start) for x in sets if x.video_start is not None]
+        return build_frames(self.people, h, starts, self.cal.our_side_set1, replays)
 
     def publish(self, result: dict, final: bool) -> None:
         assert self.client and self.game_id
         for st in result["sets"]:
-            self.client.put_set(self.game_id, st["number"], st["us"], st["them"], st["video_start"])
+            side = ral.our_half(st["number"], self.cal.our_side_set1) if self.cal.has_court else None
+            self.client.put_set(self.game_id, st["number"], st["us"], st["them"], st["video_start"], our_side=side)
         if result["actions"]:
             self.client.post_actions(self.game_id, result["actions"])
         outcomes = act.rally_outcomes(result["rallies"])
         if outcomes:
             self.client.post_rallies(self.game_id, outcomes)
+        if final and result.get("frames"):
+            try:
+                self.client.post_frames(self.game_id, result["frames"])
+            except Exception as e:  # positions are extra: the stats must still be completed
+                log.warning("player positions not sent: %s", e)
         if final:
             n = result["stats"]["rallies"]
             sets = ", ".join(f"{x['us']}:{x['them']}" for x in result["sets"]) or "brak tablicy wyników"
@@ -219,6 +246,7 @@ class Job:
         data = {
             "obs": [[o.t, o.x, o.y, o.conf, o.half] for o in self.obs],
             "readings": [[r.t, r.left, r.right, int(r.replay)] for r in self.readings],
+            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2)] for p in ps]] for t, ps in self.people],
         }
         path.write_text(json.dumps(data), encoding="utf-8")
 
@@ -226,6 +254,7 @@ class Job:
         data = json.loads(path.read_text(encoding="utf-8"))
         self.obs = [ral.BallObs(t, x, y, c, h) for t, x, y, c, h in data["obs"]]
         self.readings = [Reading(r[0], r[1], r[2], bool(r[3]) if len(r) > 3 else False) for r in data["readings"]]
+        self.people = [(t, [Person(x, y, c) for x, y, c in ps]) for t, ps in data.get("people", [])]
         self.replay_checked = not data["readings"] or len(data["readings"][0]) > 3
 
 

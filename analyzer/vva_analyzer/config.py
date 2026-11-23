@@ -62,6 +62,10 @@ class Settings:
     detect_size: int = 960  # YOLO input size (the ball is small: keep it large)
     ball_conf: float = 0.15
     model: str = "yolo11s.pt"
+    # Players for the 2D court view (same YOLO pass, COCO class "person")
+    players: bool = True
+    person_conf: float = 0.35
+    positions_every_s: float = 0.5  # one frame of player positions every this many seconds
     # Ball activity -> rallies
     gap_merge_s: float = 1.2  # detections closer than this belong to one activity segment
     min_segment_s: float = 1.0

@@ -1,0 +1,73 @@
+from pathlib import Path
+
+from vva_analyzer.config import Calibration, Settings
+from vva_analyzer.court import from_court, homography
+from vva_analyzer.pipeline import Job
+from vva_analyzer.players import Person, Tracker, build_frames, heading, team_of, to_court_points
+
+CAL = Calibration(court=[(0.20, 0.85), (0.80, 0.85), (0.70, 0.35), (0.30, 0.35)], court_ref="corners")
+
+
+def _h():
+    return homography(CAL.court, 1, 1, CAL.court_ref)
+
+
+def _person(h, x, y):
+    ix, iy = from_court(h, x, y)
+    return Person(ix, iy, 0.9)
+
+
+def test_heading_degrees():
+    assert heading(0, 1) == 0  # towards the far end line
+    assert heading(1, 0) == 90
+    assert heading(0, -1) == 180
+    assert heading(-1, 0) == 270
+
+
+def test_feet_points_map_to_metres_and_drop_people_off_court():
+    h = _h()
+    people = [_person(h, 4.5, 3.0), _person(h, 2.0, 14.0), _person(h, -5.0, 9.0)]  # last: referee stand
+    pts = to_court_points(h, people)
+    assert len(pts) == 2
+    assert any(abs(x - 4.5) < 0.01 and abs(y - 3.0) < 0.01 for x, y in pts)
+
+
+def test_tracker_keeps_ids_and_faces_the_movement():
+    tr = Tracker()
+    a = tr.update(0.0, [(2.0, 3.0), (6.0, 14.0)])
+    ids = {round(t.y): t.id for t in a}
+    b = tr.update(0.5, [(2.0, 4.0), (6.0, 13.6)])
+    assert {round(t.y): t.id for t in b} == {4: ids[3], 14: ids[14]}
+    near = next(t for t in b if t.id == ids[3])
+    assert near.facing == 0  # running towards the net (+y)
+    far = next(t for t in b if t.id == ids[14])
+    assert far.facing == 180  # standing-ish far player keeps facing the net
+
+
+def test_team_follows_set_sides():
+    starts = [(1, 0.0), (2, 1000.0)]
+    assert team_of(3.0, 10.0, starts, "near") == "us"
+    assert team_of(3.0, 1200.0, starts, "near") == "them"  # sides swapped in set 2
+    assert team_of(15.0, 1200.0, starts, "near") == "us"
+
+
+def test_build_frames_skips_replays():
+    h = _h()
+    samples = [(t / 2, [_person(h, 3.0, 4.0), _person(h, 5.0, 12.0)]) for t in range(10)]
+    frames = build_frames(samples, h, [(1, 0.0)], "near", replays=[(2.0, 3.0)])
+    assert [f["t"] for f in frames] == [0.0, 0.5, 1.0, 1.5, 3.5, 4.0, 4.5]
+    teams = sorted(p["team"] for p in frames[0]["players"])
+    assert teams == ["them", "us"]
+    assert all(p["k"] for p in frames[0]["players"])
+
+
+def test_people_go_into_the_cache_and_the_report(tmp_path: Path):
+    h = _h()
+    job = Job(CAL, Settings(), tmp_path)
+    job.people = [(1.0, [_person(h, 3.0, 4.0)])]
+    job._save(tmp_path / "c.json")
+    other = Job(CAL, Settings(), tmp_path)
+    other._load(tmp_path / "c.json")
+    assert len(other.people) == 1
+    frames = other.analyse()["frames"]
+    assert len(frames) == 1 and abs(frames[0]["players"][0]["y"] - 4.0) < 0.05

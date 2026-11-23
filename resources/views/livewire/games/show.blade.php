@@ -58,7 +58,7 @@
     <div class="grid gap-6 xl:grid-cols-12">
         {{-- Video --}}
         <div class="xl:col-span-8">
-            <div class="card overflow-hidden xl:sticky xl:top-20">
+            <div class="card overflow-hidden">
                 <div class="relative aspect-video bg-black" wire:ignore>
                     @if ($game->youtube_id)
                         <div x-ref="frame" class="size-full"></div>
@@ -79,6 +79,9 @@
                     </div>
                 </div>
                 <div x-show="emptyHint" x-cloak x-transition class="border-t border-line px-4 py-3 text-sm text-muted">{{ __('No video moments for this stat.') }}</div>
+                @if ($game->youtube_id)
+                    @include('livewire.games.partials.court-2d')
+                @endif
                 {{-- Quick pick: one player's (or the team's) serves, attacks from a zone... played back to back --}}
                 @if ($game->youtube_id)
                     @php $pickPlayers = $stats->lines->filter(fn ($l) => $l->totalActions() > 0)->map(fn ($l) => $l->player)->filter()->values(); @endphp

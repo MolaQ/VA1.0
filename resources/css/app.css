@@ -292,3 +292,106 @@
         font-size: 10px;
     }
 }
+
+/* 2D court under the video (resources/js/court2d.js) */
+.court-2d {
+    --court-out: #1e9fd8;
+    --court-in: #f6b844;
+    --court-us: var(--color-brand-600);
+    --court-them: var(--color-danger-500);
+}
+
+.court-out {
+    fill: var(--court-out);
+}
+
+.court-in {
+    fill: var(--court-in);
+    stroke: #fff;
+    stroke-width: 0.08;
+}
+
+.court-line {
+    stroke: #fff;
+    stroke-width: 0.08;
+}
+
+.court-line-dash {
+    stroke-dasharray: 0.25 0.2;
+}
+
+.court-net {
+    stroke: #fff;
+    stroke-width: 0.14;
+}
+
+.court-post {
+    fill: #fff;
+}
+
+.court-zone {
+    fill: #1e9fd8;
+    opacity: 0.35;
+    font-weight: 800;
+}
+
+.court-side {
+    fill: #fff;
+    font-weight: 700;
+    opacity: 0.9;
+}
+
+.court-dot-us {
+    --dot: var(--court-us);
+}
+
+.court-dot-them {
+    --dot: var(--court-them);
+}
+
+.court-dot-body {
+    fill: var(--dot);
+    stroke: #fff;
+    stroke-width: 0.06;
+}
+
+.court-dot-facing {
+    fill: var(--dot);
+    stroke: #fff;
+    stroke-width: 0.04;
+}
+
+.court-dot-label {
+    fill: #fff;
+    font-weight: 800;
+    pointer-events: none;
+}
+
+.court-dot-unknown .court-dot-body {
+    stroke: var(--color-warning-400);
+    stroke-width: 0.09;
+    stroke-dasharray: 0.4 0.2;
+}
+
+.court-dot-selected .court-dot-body {
+    stroke: #111;
+    stroke-width: 0.12;
+}
+
+.court-ball {
+    fill: #fff;
+    stroke: #111;
+    stroke-width: 0.06;
+}
+
+.court-ball-path {
+    stroke: #fff;
+    stroke-width: 0.06;
+    stroke-dasharray: 0.2 0.15;
+}
+
+.court-target {
+    fill: none;
+    stroke: var(--color-success-500);
+    stroke-width: 0.08;
+}

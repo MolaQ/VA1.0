@@ -26,6 +26,10 @@ use Illuminate\Support\Carbon;
  * @property float|null $video_time
  * @property int|null $zone_from
  * @property int|null $zone_to
+ * @property float|null $from_x
+ * @property float|null $from_y
+ * @property float|null $to_x
+ * @property float|null $to_y
  * @property ActionSource $source
  * @property float|null $confidence
  * @property bool $needs_review
@@ -40,7 +44,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'club_id', 'game_id', 'game_set_id', 'player_id', 'rally', 'skill', 'grade', 'video_time',
-    'zone_from', 'zone_to', 'source', 'confidence', 'needs_review', 'review_note', 'reviewed_at',
+    'zone_from', 'zone_to', 'from_x', 'from_y', 'to_x', 'to_y', 'source', 'confidence', 'needs_review', 'review_note', 'reviewed_at',
     'external_id', 'meta', 'created_by',
 ])]
 class GameAction extends Model
@@ -58,6 +62,10 @@ class GameAction extends Model
             'source' => ActionSource::class,
             'video_time' => 'float',
             'confidence' => 'float',
+            'from_x' => 'float',
+            'from_y' => 'float',
+            'to_x' => 'float',
+            'to_y' => 'float',
             'needs_review' => 'boolean',
             'reviewed_at' => 'datetime',
             'meta' => 'array',

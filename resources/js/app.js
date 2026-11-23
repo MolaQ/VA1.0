@@ -8,9 +8,11 @@ import './analytics';
 import './pwa';
 import './realtime';
 import coder from './coder';
+import court2d from './court2d';
 import ytPlayer from './youtube-player';
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('ytPlayer', ytPlayer);
     window.Alpine.data('coder', coder);
+    window.Alpine.data('court2d', court2d);
 });

@@ -24,7 +24,7 @@ class SetController extends Controller
 
         $set = DB::transaction(function () use ($game, $number, $data) {
             $set = $game->sets()->firstOrCreate(['number' => $number]);
-            $set->fill(collect($data)->only(['score_us', 'score_them', 'video_start'])->all())->save();
+            $set->fill(collect($data)->only(['score_us', 'score_them', 'video_start', 'our_side'])->all())->save();
 
             if (array_key_exists('lineup', $data)) {
                 $roster = Player::query()->forClub($game->club_id)->get();

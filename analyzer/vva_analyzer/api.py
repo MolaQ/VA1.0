@@ -56,10 +56,13 @@ class VvaClient:
     def purge_ai(self, game_id: int) -> int:
         return int(self._call("DELETE", f"games/{game_id}/actions", params={"source": "ai"}).json().get("deleted", 0))
 
-    def put_set(self, game_id: int, number: int, us: int, them: int, video_start: float | None) -> None:
+    def put_set(self, game_id: int, number: int, us: int, them: int, video_start: float | None,
+                our_side: str | None = None) -> None:
         body: dict = {"score_us": us, "score_them": them}
         if video_start is not None:
             body["video_start"] = round(video_start, 2)
+        if our_side is not None:
+            body["our_side"] = our_side  # half of the picture we defend: the 2D court view needs it
         self._call("PUT", f"games/{game_id}/sets/{number}", json=body)
 
     def post_rallies(self, game_id: int, rallies: list[dict], chunk: int = 500) -> int:
@@ -67,6 +70,13 @@ class VvaClient:
         saved = 0
         for i in range(0, len(rallies), chunk):
             saved += int(self._call("POST", f"games/{game_id}/rallies", json={"rallies": rallies[i:i + chunk]}).json().get("saved", 0))
+        return saved
+
+    def post_frames(self, game_id: int, frames: list[dict], chunk: int = 500) -> int:
+        """Player positions for the 2D court view; idempotent by video time."""
+        saved = 0
+        for i in range(0, len(frames), chunk):
+            saved += int(self._call("POST", f"games/{game_id}/frames", json={"frames": frames[i:i + chunk]}).json().get("saved", 0))
         return saved
 
     def post_actions(self, game_id: int, actions: list[dict], chunk: int = 200) -> dict:
