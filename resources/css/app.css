@@ -221,3 +221,74 @@
         @apply pointer-events-none;
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Print / "Save as PDF" (match report)
+|--------------------------------------------------------------------------
+| Light colors, no app chrome, cards kept whole across pages.
+*/
+@media print {
+    :root,
+    [data-theme='light'] {
+        --bg: #ffffff;
+        --bg-elevated: #ffffff;
+        --surface: #ffffff;
+        --surface-2: #f3f5f9;
+        --surface-3: #e8ecf3;
+        --line: rgb(15 23 42 / 0.12);
+        --line-strong: rgb(15 23 42 / 0.25);
+        --fg: #0f172a;
+        --fg-muted: #475569;
+        --fg-subtle: #64748b;
+        --shadow-card: none;
+        color-scheme: light;
+    }
+
+    @page {
+        size: A4 landscape;
+        margin: 10mm;
+    }
+
+    body {
+        background: #fff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    body > aside,
+    body > nav,
+    body header.glass,
+    .no-print {
+        display: none !important;
+    }
+
+    .lg\:pl-64 {
+        padding-left: 0 !important;
+    }
+
+    main {
+        padding: 0 !important;
+        max-width: none !important;
+    }
+
+    .card {
+        break-inside: avoid;
+        box-shadow: none !important;
+        animation: none !important;
+    }
+
+    .print-break {
+        break-before: page;
+    }
+
+    .stats-table th {
+        position: static;
+    }
+
+    .stats-table td,
+    .stats-table th {
+        padding: 2px 4px;
+        font-size: 10px;
+    }
+}

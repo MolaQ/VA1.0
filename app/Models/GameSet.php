@@ -40,4 +40,12 @@ class GameSet extends Model
     {
         return $this->hasMany(SetLineup::class);
     }
+
+    /**
+     * @return HasMany<GameRally, $this>
+     */
+    public function rallies(): HasMany
+    {
+        return $this->hasMany(GameRally::class);
+    }
 }

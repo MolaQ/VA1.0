@@ -6,7 +6,7 @@
         '-' => 'bg-warning-500/20 text-warning-400', '/' => 'bg-volley-500/20 text-volley-400', '=' => 'bg-danger-500 text-white',
     ];
 @endphp
-<div x-data="ytPlayer(@js($game->youtube_id))" x-on:vva-seek.window="seek($event.detail.t)">
+<div data-yt x-data="ytPlayer(@js($game->youtube_id))" x-on:vva-seek.window="seek($event.detail.t)">
     {{-- Header --}}
     <div class="mb-6 flex flex-wrap items-start justify-between gap-4 animate-fade-up">
         <div class="min-w-0">
@@ -27,6 +27,9 @@
                     @foreach ($game->sets as $set)<span class="rounded bg-surface-3 px-1.5 py-0.5">{{ $set->score_us }}:{{ $set->score_them }}</span>@endforeach
                 </p>
             </div>
+            @can('report', $game)
+                <x-ui.button size="sm" icon="chart" :href="route('games.report', $game)">{{ __('Report') }}</x-ui.button>
+            @endcan
             @if ($canEdit)
                 <x-ui.button variant="secondary" size="sm" icon="pencil" :href="route('games.edit', $game)">{{ __('Edit') }}</x-ui.button>
             @endif
@@ -83,14 +86,15 @@
         <div class="space-y-6 xl:col-span-4">
             @if ($canCode)
                 <x-ui.card title="{{ __('Manual coding') }}" subtitle="{{ __('Correct or complete the AI analysis. Time is taken from the player.') }}" padding="p-4">
-                    <div x-data="{ player: null, skill: null, newNumber: '' }" class="space-y-4">
+                    @php $numbers = $roster->whereNotNull('number')->mapWithKeys(fn ($p) => [$p->number => $p->id]); @endphp
+                    <div x-data="coder(@js((object) $numbers->all()))" x-on:keydown.window="onKey($event)" class="space-y-4">
                         <div class="flex items-center gap-2 text-sm">
                             <label class="text-muted">Set</label>
                             <select wire:model.live="codingSet" class="input !w-auto !py-1.5">
                                 @for ($i = 1; $i <= 5; $i++)<option value="{{ $i }}">{{ $i }}</option>@endfor
                             </select>
                             <span class="ml-auto text-muted">{{ __('Rally') }} <b class="tabular text-fg">{{ $rally }}</b></span>
-                            <x-ui.button size="sm" variant="secondary" wire:click="nextRally">+1</x-ui.button>
+                            <x-ui.button size="sm" variant="secondary" wire:click="nextRally" title="N">+1</x-ui.button>
                         </div>
                         <div>
                             <p class="label">{{ __('1. Player') }}</p>
@@ -101,7 +105,7 @@
                                             class="rounded-xl py-2 font-display text-lg font-bold transition active:scale-95">{{ $p->number ?? '–' }}</button>
                                 @endforeach
                             </div>
-                            <form class="mt-2 flex gap-1.5" x-on:submit.prevent="if (newNumber !== '') { $wire.addNumber(parseInt(newNumber)).then(id => { if (id) player = id; newNumber = '' }) }">
+                            <form class="mt-2 flex gap-1.5" x-on:submit.prevent="if (newNumber !== '') { $wire.addNumber(parseInt(newNumber)).then(id => { if (id) { player = id; roster[parseInt(newNumber)] = id } newNumber = '' }) }">
                                 <input type="number" min="0" max="99" x-model="newNumber" class="input !py-1.5 text-sm" placeholder="{{ __('Another number, e.g. 47') }}" aria-label="{{ __('Another number, e.g. 47') }}">
                                 <x-ui.button type="submit" size="sm" variant="secondary" icon="plus">{{ __('Add') }}</x-ui.button>
                             </form>
@@ -110,22 +114,53 @@
                             <p class="label">{{ __('2. Skill') }}</p>
                             <div class="grid grid-cols-3 gap-1.5">
                                 @foreach ($skills as $s)
-                                    <button type="button" x-on:click="skill = @js($s->value)" :disabled="! player"
+                                    <button type="button" x-on:click="pickSkill(@js($s->value))" :disabled="! player" title="{{ $s->code() }}"
                                             :class="skill === @js($s->value) ? 'bg-brand-500 text-white' : 'bg-surface-2 hover:bg-surface-3'"
-                                            class="rounded-xl py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40">{{ $s->label() }}</button>
+                                            class="rounded-xl py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-40">{{ $s->label() }} <span class="text-[10px] opacity-60">{{ $s->code() }}</span></button>
                                 @endforeach
                             </div>
+                        </div>
+                        <div x-show="usesZones()" x-cloak x-transition>
+                            <p class="label">
+                                <span x-show="skill === 'attack'">{{ __('Zone (optional): from, then to') }}</span>
+                                <span x-show="skill === 'serve'">{{ __('Serve target zone (optional)') }}</span>
+                            </p>
+                            {{-- opponent court seen from our side: 4 3 2 / 7 8 9 / 5 6 1 --}}
+                            <div class="grid grid-cols-3 gap-1">
+                                @foreach ([4, 3, 2, 7, 8, 9, 5, 6, 1] as $z)
+                                    <button type="button" x-on:click="pickZone({{ $z }})"
+                                            :class="zoneFrom === {{ $z }} ? 'bg-accent-500 text-white' : (zoneTo === {{ $z }} ? 'bg-brand-500 text-white' : 'bg-surface-2 hover:bg-surface-3')"
+                                            class="rounded-lg py-1.5 text-sm font-bold tabular transition">{{ $z }}</button>
+                                @endforeach
+                            </div>
+                            <p class="mt-1 text-xs text-muted" x-show="zoneFrom || zoneTo"><span x-show="zoneFrom">{{ __('From') }} <b x-text="zoneFrom"></b></span> <span x-show="zoneTo">→ <b x-text="zoneTo"></b></span></p>
                         </div>
                         <div>
                             <p class="label">{{ __('3. Grade') }}</p>
                             <div class="grid grid-cols-6 gap-1.5">
                                 @foreach ($grades as $g)
                                     <button type="button" :disabled="! player || ! skill" title="{{ $g->label() }}"
-                                            x-on:click="$wire.record(player, skill, @js($g->value), currentTime()); skill = null"
+                                            x-on:click="grade(@js($g->value))"
                                             class="rounded-xl py-2.5 font-display text-xl font-bold transition active:scale-95 disabled:opacity-30 {{ $gradeStyles[$g->value] }}">{{ $g->value }}</button>
                                 @endforeach
                             </div>
                         </div>
+                        <div>
+                            <p class="label">{{ __('Rally point (opponent error, opponent kill)') }}</p>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <button type="button" x-on:click="point('us')" class="rounded-xl bg-success-500/15 py-2 text-sm font-semibold text-success-400 transition hover:bg-success-500/25 active:scale-95">{{ __('Point us') }} <span class="text-[10px] opacity-60">P</span></button>
+                                <button type="button" x-on:click="point('them')" class="rounded-xl bg-danger-500/15 py-2 text-sm font-semibold text-danger-400 transition hover:bg-danger-500/25 active:scale-95">{{ __('Point opponent') }} <span class="text-[10px] opacity-60">O</span></button>
+                            </div>
+                        </div>
+                        <details class="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted">
+                            <summary class="cursor-pointer font-semibold text-fg">{{ __('Keyboard shortcuts') }}</summary>
+                            <ul class="mt-2 space-y-1">
+                                <li><kbd>13</kbd> {{ __('jersey number') }} · <kbd>S R A B D E F</kbd> {{ __('skill') }} · <kbd>1–9</kbd> {{ __('zone') }}</li>
+                                <li><kbd># + ! - / =</kbd> {{ __('grade, records the touch') }}</li>
+                                <li><kbd>P</kbd> / <kbd>O</kbd> {{ __('point us / opponent') }} · <kbd>N</kbd> {{ __('next rally') }}</li>
+                                <li><kbd>{{ __('Space') }}</kbd> {{ __('play / pause') }} · <kbd>← →</kbd> ±3 s · <kbd>Esc</kbd> {{ __('clear') }}</li>
+                            </ul>
+                        </details>
                     </div>
                 </x-ui.card>
             @endif

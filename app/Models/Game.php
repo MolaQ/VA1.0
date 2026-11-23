@@ -86,6 +86,14 @@ class Game extends Model
         return $this->hasMany(GameAction::class);
     }
 
+    /**
+     * @return HasMany<GameRally, $this>
+     */
+    public function rallies(): HasMany
+    {
+        return $this->hasMany(GameRally::class);
+    }
+
     public function title(): string
     {
         $home = $this->team->name ?? __('Team');

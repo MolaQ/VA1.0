@@ -127,6 +127,11 @@ class ActionIngestor
             ->when($source !== null, fn ($q) => $q->where('source', $source))
             ->delete();
 
+        // Rally outcomes read by the analyzer go with its actions; a trainer's stay.
+        $game->rallies()
+            ->when($source !== null, fn ($q) => $q->where('source', $source))
+            ->delete();
+
         if ($deleted > 0) {
             GameActionsRecorded::dispatch($game, 0, 0, $deleted);
         }

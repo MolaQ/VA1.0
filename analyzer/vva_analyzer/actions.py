@@ -38,3 +38,23 @@ def report(rallies: list[Rally]) -> list[dict]:
         "serve_side": r.serve_side, "crossings": r.crossings, "serve_grade": r.serve_grade,
         "confidence": r.confidence,
     } for r in rallies]
+
+
+def rally_outcomes(report_rows: list[dict]) -> list[dict]:
+    """Server and winner of every rally (both teams), from `report()` rows, for the VVA rallies endpoint."""
+    side = {"us", "them"}
+    out = []
+    for r in report_rows:
+        server = r.get("server") if r.get("server") in side else None
+        winner = r.get("winner") if r.get("winner") in side else None
+        if server is None and winner is None:
+            continue
+        start = r.get("start")
+        out.append({
+            "set": r["set"],
+            "rally": r["rally"],
+            "server": server,
+            "winner": winner,
+            "video_time": round(start, 2) if start is not None else None,
+        })
+    return out

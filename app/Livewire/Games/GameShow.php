@@ -9,6 +9,7 @@ use App\Jobs\RequestVideoAnalysis;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
 use App\Models\GameAction;
+use App\Models\GameRally;
 use App\Models\Player;
 use App\Services\ActionIngestor;
 use App\Stats\GameStatsCalculator;
@@ -137,19 +138,24 @@ class GameShow extends Component
     }
 
     /**
-     * Manual coding (fallback / correction of the AI): one tap per touch.
+     * Manual coding (fallback / correction of the AI): one tap (or keystroke) per touch.
+     * Zones are optional: attack from / to, serve target.
      */
-    public function record(int $playerId, string $skill, string $grade, ?float $time, ActionIngestor $ingestor): void
+    public function record(int $playerId, string $skill, string $grade, ?float $time, ?int $zoneFrom = null, ?int $zoneTo = null): void
     {
         Gate::authorize('code', $this->game);
 
-        $result = $ingestor->ingest($this->game, [[
+        $zone = fn (?int $z) => $z !== null && $z >= 1 && $z <= 9 ? $z : null;
+
+        $result = app(ActionIngestor::class)->ingest($this->game, [[
             'player_id' => $playerId,
             'set' => $this->codingSet,
             'rally' => $this->rally,
             'skill' => Skill::from($skill)->value,
             'grade' => Grade::from($grade)->value,
             'video_time' => $time !== null ? round(max(0, $time), 2) : null,
+            'zone_from' => $zone($zoneFrom),
+            'zone_to' => $zone($zoneTo),
         ]], ActionSource::Manual, $this->user());
 
         if ($result->skipped !== []) {
@@ -162,6 +168,27 @@ class GameShow extends Component
         if (in_array($grade, ['#', '='], true) && $skill !== Skill::Reception->value) {
             $this->rally++;
         }
+    }
+
+    /**
+     * Close the current rally with an explicit winner: for points our touches don't explain
+     * (opponent error, opponent kill or ace).
+     */
+    public function point(string $winner, ?float $time = null): void
+    {
+        Gate::authorize('code', $this->game);
+        abort_unless(in_array($winner, [GameRally::US, GameRally::THEM], true), 422);
+
+        $set = $this->game->sets()->firstOrCreate(['number' => $this->codingSet]);
+        GameRally::updateOrCreate(['game_set_id' => $set->id, 'number' => $this->rally], [
+            'game_id' => $this->game->id,
+            'winner' => $winner,
+            'video_time' => $time !== null ? round(max(0, $time), 2) : null,
+            'source' => ActionSource::Manual,
+        ]);
+
+        $this->rally++;
+        $this->dispatch('stats-refreshed');
     }
 
     public function nextRally(): void
