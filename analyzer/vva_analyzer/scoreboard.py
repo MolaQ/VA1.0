@@ -16,6 +16,33 @@ class Reading:
     t: float
     left: int | None
     right: int | None
+    replay: bool = False  # the broadcast shows a replay, not live play
+
+
+REPLAY_BOX = (0.40, 0.03, 0.20, 0.09)  # Sportcam's yellow "REPLAY" badge, top centre
+
+
+def is_replay(frame, box: Box = REPLAY_BOX, min_share: float = 0.12) -> bool:
+    """Sportcam marks replays with a yellow badge; ball activity during a replay isn't live play."""
+    import cv2
+
+    roi = crop(frame, box)
+    if roi.size == 0:
+        return False
+    mask = cv2.inRange(cv2.cvtColor(roi, cv2.COLOR_BGR2HSV), (18, 120, 150), (38, 255, 255))
+    return float(mask.mean()) / 255.0 >= min_share
+
+
+def replay_spans(readings: list[Reading], pad: float = 1.5) -> list[tuple[float, float]]:
+    spans: list[tuple[float, float]] = []
+    for r in readings:
+        if not r.replay:
+            continue
+        if spans and r.t - pad <= spans[-1][1]:
+            spans[-1] = (spans[-1][0], r.t + pad)
+        else:
+            spans.append((r.t - pad, r.t + pad))
+    return spans
 
 
 def stabilise(readings: list[Reading], cal: Calibration, s: Settings) -> list[ScoreEvent]:
@@ -139,4 +166,5 @@ class OcrReader:
 
     def read(self, t: float, frame, cal: Calibration) -> Reading:
         assert cal.score_left and cal.score_right
-        return Reading(t, self.number(crop(frame, cal.score_left)), self.number(crop(frame, cal.score_right)))
+        return Reading(t, self.number(crop(frame, cal.score_left)), self.number(crop(frame, cal.score_right)),
+                       is_replay(frame))

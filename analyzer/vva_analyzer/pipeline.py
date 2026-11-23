@@ -12,7 +12,7 @@ from . import actions as act
 from . import rallies as ral
 from .api import VvaClient
 from .config import Calibration, Settings
-from .scoreboard import Reading, stabilise
+from .scoreboard import Reading, is_replay, replay_spans, stabilise
 
 log = logging.getLogger("vva")
 
@@ -27,6 +27,7 @@ class Job:
         self.on_progress = on_progress or (lambda p, m: log.info("%3d%% %s", p, m))
         self.obs: list[ral.BallObs] = []
         self.readings: list[Reading] = []
+        self.replay_checked = True  # False for caches made before replays were detected
         self.whistles: list[float] = []
 
     # ------------------------------------------------------------------ steps
@@ -47,7 +48,7 @@ class Job:
             self._load(cache)
             self._rehalf()  # the court calibration may have changed since the scan
             self.progress(85, "Używam zapisanych wykryć")
-            if self.cal.has_scoreboard and (rescore or not self.readings):
+            if (self.cal.has_scoreboard and (rescore or not self.readings)) or not self.replay_checked:
                 self._read_scores(video, vid)
                 self._save(cache)
         else:
@@ -100,8 +101,8 @@ class Job:
         for t, frame in vid.frames(video, self.s.sample_fps):
             batch.append(frame)
             times.append(t)
-            if ocr and t >= next_ocr:
-                self.readings.append(ocr.read(t, frame, self.cal))
+            if t >= next_ocr:
+                self.readings.append(ocr.read(t, frame, self.cal) if ocr else Reading(t, None, None, is_replay(frame)))
                 next_ocr = t + self.s.ocr_every_s
             if len(batch) >= 16:
                 flush()
@@ -133,15 +134,15 @@ class Job:
             o.half = net.half(o.x, o.y)
 
     def _read_scores(self, video: Path, vid) -> None:
-        """Only the score overlay, once per second (minutes instead of a full scan)."""
+        """Only the score overlay and replay badge, once per second (minutes instead of a full scan)."""
         from .scoreboard import OcrReader
 
         _, _, _, duration = vid.info(video)
-        ocr = OcrReader(gpu=self.device not in (None, "cpu"))
+        ocr = OcrReader(gpu=self.device not in (None, "cpu")) if self.cal.has_scoreboard else None
         self.readings = []
         last = -1
         for t, frame in vid.frames(video, 1.0 / self.s.ocr_every_s):
-            self.readings.append(ocr.read(t, frame, self.cal))
+            self.readings.append(ocr.read(t, frame, self.cal) if ocr else Reading(t, None, None, is_replay(frame)))
             pct = int(100 * t / duration) if duration else 0
             if pct // 5 != last:
                 last = pct // 5
@@ -150,7 +151,9 @@ class Job:
 
     def analyse(self) -> dict:
         s = self.s
-        candidates = ral.rally_candidates(ral.activity(ral.drop_static(self.obs, s), s), s)
+        spans = replay_spans(self.readings)
+        live = _outside(self.obs, spans)
+        candidates = ral.rally_candidates(ral.activity(ral.drop_static(live, s), s), s)
         candidates = ral.trim_with_whistles(candidates, self.whistles)
         scores = stabilise(self.readings, self.cal, s)
         rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1)
@@ -162,6 +165,7 @@ class Job:
                 "score_reads_ok": sum(1 for r in self.readings if r.left is not None and r.right is not None),
                 "score_reads": len(self.readings),
                 "ball_detections": len(self.obs),
+                "replay_seconds": sum(1 for r in self.readings if r.replay),
                 "plays": len(candidates),
                 "score_changes": len(scores),
                 "whistles": len(self.whistles),
@@ -186,11 +190,26 @@ class Job:
     def _save(self, path: Path) -> None:
         data = {
             "obs": [[o.t, o.x, o.y, o.conf, o.half] for o in self.obs],
-            "readings": [[r.t, r.left, r.right] for r in self.readings],
+            "readings": [[r.t, r.left, r.right, int(r.replay)] for r in self.readings],
         }
         path.write_text(json.dumps(data), encoding="utf-8")
 
     def _load(self, path: Path) -> None:
         data = json.loads(path.read_text(encoding="utf-8"))
         self.obs = [ral.BallObs(t, x, y, c, h) for t, x, y, c, h in data["obs"]]
-        self.readings = [Reading(t, a, b) for t, a, b in data["readings"]]
+        self.readings = [Reading(r[0], r[1], r[2], bool(r[3]) if len(r) > 3 else False) for r in data["readings"]]
+        self.replay_checked = not data["readings"] or len(data["readings"][0]) > 3
+
+
+def _outside(obs: list[ral.BallObs], spans: list[tuple[float, float]]) -> list[ral.BallObs]:
+    """Ball positions outside the given (sorted) time spans."""
+    if not spans:
+        return obs
+    out, i = [], 0
+    for o in sorted(obs, key=lambda o: o.t):
+        while i < len(spans) and spans[i][1] < o.t:
+            i += 1
+        if i < len(spans) and spans[i][0] <= o.t <= spans[i][1]:
+            continue
+        out.append(o)
+    return out

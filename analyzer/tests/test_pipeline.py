@@ -51,3 +51,22 @@ def test_court_halves_follow_the_current_calibration(tmp_path: Path):
     job.obs = [BallObs(1.0, 0.2, 0.6, 0.5, "far"), BallObs(2.0, 0.8, 0.6, 0.5, None)]
     job._rehalf()
     assert [o.half for o in job.obs] == ["near", "far"]
+
+
+def test_replays_are_not_live_play():
+    import numpy as np
+
+    from vva_analyzer import rallies as ral
+    from vva_analyzer.pipeline import _outside
+    from vva_analyzer.scoreboard import Reading, is_replay, replay_spans
+
+    frame = np.full((1080, 1920, 3), 200, np.uint8)
+    assert not is_replay(frame)
+    frame[50:110, 855:1065] = (0, 220, 250)  # yellow badge (BGR)
+    assert is_replay(frame)
+
+    reads = [Reading(float(t), 1, 1, 10 <= t <= 14) for t in range(30)]
+    spans = replay_spans(reads)
+    assert spans == [(8.5, 15.5)]
+    obs = [ral.BallObs(float(t), 0.5, 0.5) for t in range(30)]
+    assert [o.t for o in _outside(obs, spans)] == [t for t in range(30) if not 9 <= t <= 15]
