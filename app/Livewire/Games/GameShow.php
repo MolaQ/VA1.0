@@ -241,7 +241,7 @@ class GameShow extends Component
      * Player positions for the 2D court view in a window of the video, plus the jersey
      * numbers the analyst gave to analyzer tracks.
      *
-     * @return array{frames: list<array<string, mixed>>, labels: array<int, array{team: string|null, n: int|null}>}
+     * @return array{frames: array<int, array<string, mixed>>, labels: array<int, array{team: string|null, n: int|null}>}
      */
     public function frames(float $from, float $to): array
     {
@@ -285,7 +285,7 @@ class GameShow extends Component
     /**
      * Serves and receptions around a moment, to attach the ball's landing point to one of them.
      *
-     * @return list<array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     public function ballActions(float $t): array
     {
