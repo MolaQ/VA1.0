@@ -26,7 +26,7 @@ class BallDetector:
         """Best ball per frame as (x, y, conf) normalised, or None."""
         results = self.model.predict(
             batch, imgsz=self.s.detect_size, conf=self.s.ball_conf, classes=self.classes,
-            device=self.device, half=self.device not in (None, "cpu"), verbose=False,
+            device=self.device, verbose=False,
         )
         out: list[tuple[float, float, float] | None] = []
         for r in results:
