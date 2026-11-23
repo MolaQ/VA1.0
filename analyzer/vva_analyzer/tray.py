@@ -51,6 +51,43 @@ def setup_logging() -> str:
 
 # ----------------------------------------------------------------- dialogs (tkinter)
 
+def clipboard_support(entry, root) -> None:
+    """Ctrl+V/C/A by physical key (Tk misses them with CapsLock or some layouts) + right-click menu."""
+    import tkinter as tk
+
+    def paste(*_):
+        try:
+            text = root.clipboard_get().strip()
+        except tk.TclError:
+            return "break"
+        try:
+            entry.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+        entry.insert("insert", text)
+        return "break"
+
+    def on_ctrl(event):
+        # Windows virtual key codes: V=86, C=67, A=65, X=88
+        if event.keycode == 86:
+            return paste()
+        if event.keycode == 65:
+            entry.select_range(0, "end")
+            return "break"
+        if event.keycode in (67, 88):
+            entry.event_generate("<<Copy>>" if event.keycode == 67 else "<<Cut>>")
+            return "break"
+        return None
+
+    entry.bind("<Control-KeyPress>", on_ctrl)
+    menu = tk.Menu(entry, tearoff=0)
+    menu.add_command(label="Wklej", command=paste)
+    menu.add_command(label="Zaznacz wszystko", command=lambda: entry.select_range(0, "end"))
+    menu.add_command(label="Wyczyść", command=lambda: entry.delete(0, "end"))
+    entry.bind("<Button-3>", lambda e: menu.tk_popup(e.x_root, e.y_root))
+    return paste
+
+
 def settings_dialog(cfg: AgentConfig) -> bool:
     """Server address + token. Returns True when saved."""
     import tkinter as tk
@@ -69,9 +106,22 @@ def settings_dialog(cfg: AgentConfig) -> bool:
     server.insert(0, cfg.server or "http://localhost/molak/VVA/public")
     server.grid(row=1, column=0, **pad)
     tk.Label(root, text="Token z VVA (Klub → Integracje AI → Utwórz token):").grid(row=2, column=0, sticky="w", **pad)
-    token = tk.Entry(root, width=52, show="•")
+    row = tk.Frame(root)
+    row.grid(row=3, column=0, sticky="w", **pad)
+    token = tk.Entry(row, width=40, show="•")
     token.insert(0, cfg.token)
-    token.grid(row=3, column=0, **pad)
+    token.pack(side="left")
+    paste_token = clipboard_support(token, root)
+    clipboard_support(server, root)
+
+    def paste_button() -> None:
+        token.delete(0, "end")
+        paste_token()
+
+    tk.Button(row, text="Wklej ze schowka", command=paste_button).pack(side="left", padx=(6, 0))
+    shown = tk.BooleanVar(value=False)
+    tk.Checkbutton(row, text="pokaż", variable=shown,
+                   command=lambda: token.config(show="" if shown.get() else "•")).pack(side="left", padx=(6, 0))
     gpu = tk.BooleanVar(value=cfg.device != "cpu")
     tk.Checkbutton(root, text="Używaj karty graficznej (zalecane)", variable=gpu).grid(row=4, column=0, sticky="w", **pad)
     keep = tk.BooleanVar(value=cfg.keep_videos)
@@ -160,6 +210,15 @@ class TrayApp:
         else:
             subprocess.Popen(["xdg-open", self.log_path])
 
+    def open_config(self, *_):
+        path = app_dir() / "config.json"
+        if not path.exists():
+            self.cfg.save()
+        if sys.platform == "win32":
+            subprocess.Popen(["notepad.exe", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+
     def settings(self, *_):
         threading.Thread(target=self._settings, daemon=True).start()
 
@@ -167,6 +226,8 @@ class TrayApp:
         if not self.dialog.acquire(blocking=False):
             return
         try:
+            fresh = AgentConfig.load()  # the file may have been edited in Notepad
+            self.cfg.server, self.cfg.token = fresh.server or self.cfg.server, fresh.token or self.cfg.token
             if settings_dialog(self.cfg):
                 self.agent.wake.set()
         finally:
@@ -261,6 +322,7 @@ class TrayApp:
             item("Kalibruj kamerę…", self.calibrate),
             item("Ustawienia…", self.settings),
             item("Pokaż log", self.open_log),
+            item("Otwórz plik ustawień", self.open_config),
             item("Przeinstaluj z GPU (NVIDIA)", self.reinstall_gpu, visible=lambda _: self.gpu_ok is False),
             pystray.Menu.SEPARATOR,
             item("Zakończ", self.quit),

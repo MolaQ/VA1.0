@@ -123,6 +123,9 @@ class Agent:
     def tick(self) -> bool:
         """Take and analyse one match. True when there was work."""
         if not self.cfg.ready:
+            fresh = AgentConfig.load()  # settings may have been saved by hand (Notepad)
+            self.cfg.server, self.cfg.token = fresh.server, fresh.token
+        if not self.cfg.ready:
             self._set("setup", "Uzupełnij ustawienia: adres VVA i token")
             return False
         cal_path = self.cfg.calibration_path
