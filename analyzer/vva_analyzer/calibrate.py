@@ -43,8 +43,8 @@ def run(frame, existing: Calibration | None = None) -> Calibration:
     cal.court = [(x / w, y / h) for x, y in points] if len(points) == 4 else cal.court
     cal.our_side_set1 = "near"  # the half of points 1-2 is "near" by definition
 
-    for attr, label in (("score_left", "LEFT team points on the score overlay"),
-                        ("score_right", "RIGHT team points on the score overlay")):
+    for attr, label in (("score_left", "points of the FIRST team on the overlay (left or top row)"),
+                        ("score_right", "points of the SECOND team on the overlay (right or bottom row)")):
         print(f"Draw a box around the {label}, then Enter (Esc = no overlay)")
         x, y, bw, bh = cv2.selectROI(win, frame, showCrosshair=False)
         if bw and bh:
@@ -52,6 +52,6 @@ def run(frame, existing: Calibration | None = None) -> Calibration:
     cv2.destroyAllWindows()
 
     if cal.has_scoreboard:
-        answer = input("Are OUR points on the left or right of the overlay? [l/r] ").strip().lower()
+        answer = input("Is OUR team the first (left/top) or second (right/bottom) on the overlay? [l/r] ").strip().lower()
         cal.our_score = "right" if answer.startswith("r") else "left"
     return cal
