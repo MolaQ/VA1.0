@@ -7,7 +7,10 @@ param(
     [switch]$Gpu,        # force the NVIDIA (CUDA) version, even if no card is detected
     [switch]$StartTray   # start VVA Analyzer when done (used by "Przeinstaluj z GPU" in the tray)
 )
-$ErrorActionPreference = 'Stop'
+# 'Continue': Windows PowerShell 5.1 turns any stderr line of python/pip (warnings, a
+# "Traceback" from a probe) into a fatal error under 'Stop'. Native commands are checked
+# through $LASTEXITCODE instead; cmdlets that must succeed use -ErrorAction Stop.
+$ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 $Host.UI.RawUI.WindowTitle = 'VVA Analyzer: instalacja'
 Start-Transcript -Path (Join-Path $AppDir 'install.log') -Append | Out-Null
@@ -33,7 +36,7 @@ function Test-NvidiaGpu {
 
 function Install-Torch($vpy, [bool]$useGpu) {
     $current = & $vpy -c "import torch; print('cuda' if torch.version.cuda else 'cpu')" 2>$null
-    if ($LASTEXITCODE -ne 0) { $current = '' }
+    $current = if ($LASTEXITCODE -eq 0) { "$current".Trim() } else { '' }
     $want = if ($useGpu) { 'cuda' } else { 'cpu' }
     if ($current -eq $want) { Write-Host "PyTorch ($want) już zainstalowany."; return }
     if ($current) {
@@ -76,7 +79,7 @@ try {
     if (-not $py) {
         Step 'Pobieram i instaluję Pythona 3.12 (tylko dla tego użytkownika)'
         $setup = Join-Path $env:TEMP 'python-3.12.10-amd64.exe'
-        Invoke-WebRequest 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile $setup
+        Invoke-WebRequest 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe' -OutFile $setup -ErrorAction Stop
         Start-Process $setup -ArgumentList '/quiet InstallAllUsers=0 Include_launcher=1 PrependPath=0 Include_test=0' -Wait
         $py = Find-Python312
         if (-not $py) { throw 'Instalacja Pythona 3.12 nie powiodła się.' }
@@ -88,6 +91,7 @@ try {
     if (-not (Test-Path $vpy)) {
         Step 'Tworzę środowisko programu'
         & $py -m venv $venv
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $vpy)) { throw 'Nie udało się utworzyć środowiska Pythona.' }
     }
     & $vpy -m pip install --upgrade pip --quiet
 
@@ -105,6 +109,7 @@ try {
     New-Item -ItemType Directory -Force -Path $data | Out-Null
     Push-Location $data
     & $vpy -c "from ultralytics import YOLO; YOLO('yolo11s.pt'); import easyocr; easyocr.Reader(['en'], gpu=False, verbose=False); import torch; print('GPU:', torch.cuda.is_available())"
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Modele pobiorą się przy pierwszej analizie.' -ForegroundColor Yellow }
     Pop-Location
 
     Step 'Gotowe!'
@@ -118,7 +123,9 @@ try {
     exit 0
 } catch {
     Write-Host ""
-    Write-Host "BŁĄD: $_" -ForegroundColor Red
+    Write-Host "BŁĄD: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host ($_ | Out-String)
+    Write-Host $_.ScriptStackTrace
     Write-Host "Log: $(Join-Path $AppDir 'install.log')"
     Stop-Transcript | Out-Null
     Read-Host 'Naciśnij Enter, aby zamknąć'
