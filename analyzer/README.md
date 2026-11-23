@@ -29,6 +29,7 @@ Raz, w terminalu (PowerShell):
 2. Zainstaluj **ffmpeg**: `winget install Gyan.FFmpeg --source winget` (potem otwórz nowy terminal i sprawdź `ffmpeg -version`).
    Przy błędzie certyfikatu pobierz `ffmpeg-release-essentials.zip` z https://www.gyan.dev/ffmpeg/builds/, rozpakuj do `C:\ffmpeg`
    i dodaj `C:\ffmpeg\bin` do zmiennej PATH.
+   Zalecane też **Deno** (YouTube wymaga go do części formatów): `winget install DenoLand.Deno --source winget`.
 3. W katalogu projektu:
    ```powershell
    cd analyzer

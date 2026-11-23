@@ -8,7 +8,15 @@ from pathlib import Path
 
 def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
     """Download a YouTube video (only recordings you own or may analyse) as mp4."""
+    import shutil
+
     from yt_dlp import YoutubeDL
+
+    if shutil.which("ffmpeg") is None:
+        raise SystemExit(
+            "ffmpeg nie jest widoczny w tym terminalu (ffmpeg not found on PATH).\n"
+            "Zainstaluj go (README: Instalacja, krok 2), otwórz NOWY terminal i sprawdź `ffmpeg -version`."
+        )
 
     workdir.mkdir(parents=True, exist_ok=True)
     opts = {
