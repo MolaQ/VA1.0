@@ -55,10 +55,11 @@ Za każdym razem zaczynasz od aktywacji środowiska: `cd analyzer` i `.venv\Scri
 python -m vva_analyzer calibrate --url "https://www.youtube.com/watch?v=XCXJATWV9O4" --at 300
 ```
 
-- Kliknij 4 narożniki boiska: najpierw dwa narożniki linii końcowej po stronie, na której **my** gramy w 1. secie,
-  potem dwa narożniki drugiej linii końcowej (w tej samej kolejności stron). Backspace cofa punkt.
-- Zaznacz prostokątem punkty lewej drużyny na nakładce i Enter, potem punkty prawej drużyny i Enter.
-- W terminalu odpowiedz, po której stronie nakładki są nasze punkty.
+- Kliknij 4 końce **linii ataku** (linie 3 m od siatki): najpierw linia na połowie, na której **my** gramy w 1. secie,
+  koniec przy dalszej linii bocznej, potem przy bliższej; następnie linia ataku drugiej połowy: koniec przy bliższej
+  linii bocznej, potem przy dalszej. Backspace cofa punkt.
+- Zaznacz prostokątem punkty pierwszej drużyny na nakładce (lewej albo górnej) i Enter, potem drugiej i Enter.
+- W terminalu odpowiedz, czy nasza drużyna jest na nakładce pierwsza (`l`), czy druga (`r`).
 
 Powstaje `calibration.json`. `--at 300` to sekunda nagrania, na której widać boisko i wynik.
 

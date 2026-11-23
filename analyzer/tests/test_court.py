@@ -25,6 +25,15 @@ def test_crossings_ignore_single_flickers():
     assert net_crossings(["near"] * 3 + ["far"] * 3 + ["near"] * 3) == 2
 
 
+def test_attack_line_reference():
+    pts = [(0.30, 0.40), (0.25, 0.80), (0.75, 0.80), (0.70, 0.40)]
+    h = homography(pts, 1000, 1000, "attack")
+    assert [round(v, 3) for v in to_court(h, 300, 400)] == [0, 6]
+    assert [round(v, 3) for v in to_court(h, 750, 800)] == [9, 12]
+    net = NetLine(h)
+    assert net.half(200, 600) == "near" and net.half(800, 600) == "far"
+
+
 def test_zones():
     assert zone(1, 1) == 5 and zone(8, 1) == 1 and zone(4.5, 8) == 3
     assert zone(8, 17) == 5  # far team: their left is the image right

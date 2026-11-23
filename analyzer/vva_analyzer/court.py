@@ -15,10 +15,17 @@ COURT_L = 18.0
 NET_Y = 9.0
 
 
-def homography(corners: list[Point], width: int, height: int) -> np.ndarray:
-    """3x3 matrix mapping image pixels to court metres. `corners` normalised, order NL, NR, FR, FL."""
-    src = np.array([[x * width, y * height] for x, y in corners], dtype=np.float64)
-    dst = np.array([[0, 0], [COURT_W, 0], [COURT_W, COURT_L], [0, COURT_L]], dtype=np.float64)
+REFERENCES = {
+    # A1, A2, B2, B1 in court metres
+    "corners": [[0, 0], [COURT_W, 0], [COURT_W, COURT_L], [0, COURT_L]],
+    "attack": [[0, NET_Y - 3], [COURT_W, NET_Y - 3], [COURT_W, NET_Y + 3], [0, NET_Y + 3]],
+}
+
+
+def homography(points: list[Point], width: int, height: int, ref: str = "corners") -> np.ndarray:
+    """3x3 matrix mapping image pixels to court metres. `points` normalised, order A1, A2, B2, B1."""
+    src = np.array([[x * width, y * height] for x, y in points], dtype=np.float64)
+    dst = np.array(REFERENCES[ref], dtype=np.float64)
     return _find_homography(src, dst)
 
 

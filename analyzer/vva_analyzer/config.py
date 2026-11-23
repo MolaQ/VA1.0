@@ -16,9 +16,12 @@ Box = tuple[float, float, float, float]  # x, y, w, h (normalised)
 
 @dataclass
 class Calibration:
-    # Court corners clockwise from the near-left corner (closest to the camera):
-    # near-left, near-right, far-right, far-left.
+    # Four reference points on the floor, order: A1, A2 on the "near" half (where WE play in
+    # set 1), then B2, B1 on the other half (B2 on the same sideline as A2).
+    # court_ref = "attack": the ends of the two 3 m attack lines (always in frame from a side stand);
+    # court_ref = "corners": the four court corners.
     court: list[Point] = field(default_factory=list)
+    court_ref: str = "attack"
     # Scoreboard overlay: where the points of each side are shown.
     score_left: Box | None = None
     score_right: Box | None = None
@@ -35,6 +38,7 @@ class Calibration:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         cal = cls()
         cal.court = [tuple(p) for p in data.get("court", [])]  # type: ignore[misc]
+        cal.court_ref = data.get("court_ref", "corners")
         cal.score_left = tuple(data["score_left"]) if data.get("score_left") else None  # type: ignore[assignment]
         cal.score_right = tuple(data["score_right"]) if data.get("score_right") else None  # type: ignore[assignment]
         cal.our_score = data.get("our_score", "left")

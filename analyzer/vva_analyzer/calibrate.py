@@ -5,10 +5,10 @@ from __future__ import annotations
 from .config import Calibration
 
 STEPS = [
-    "1/4: corner of the END LINE on the half where WE play in set 1 (left one)",
-    "2/4: the other corner of that end line",
-    "3/4: far end line corner, same side as point 2",
-    "4/4: far end line corner, same side as point 1",
+    "1/4: OUR half in set 1: end of the 3 m attack line on the far sideline",
+    "2/4: the other end of that attack line (near sideline)",
+    "3/4: OTHER half: end of its attack line on the near sideline",
+    "4/4: the other end of that attack line (far sideline)",
 ]
 
 
@@ -40,7 +40,9 @@ def run(frame, existing: Calibration | None = None) -> Calibration:
             points.pop()
         if key == 27:
             break
-    cal.court = [(x / w, y / h) for x, y in points] if len(points) == 4 else cal.court
+    if len(points) == 4:
+        cal.court = [(x / w, y / h) for x, y in points]
+        cal.court_ref = "attack"
     cal.our_side_set1 = "near"  # the half of points 1-2 is "near" by definition
 
     for attr, label in (("score_left", "points of the FIRST team on the overlay (left or top row)"),

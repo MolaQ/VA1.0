@@ -71,7 +71,7 @@ class Job:
         from .detect import BallDetector
 
         w, h, _, duration = vid.info(video)
-        net = NetLine(homography(self.cal.court, w, h)) if self.cal.has_court else None
+        net = NetLine(homography(self.cal.court, w, h, self.cal.court_ref)) if self.cal.has_court else None
         detector = BallDetector(self.s, self.device)
         ocr = None
         if self.cal.has_scoreboard:
