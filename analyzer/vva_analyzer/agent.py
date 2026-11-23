@@ -65,7 +65,12 @@ class AgentConfig:
         path = path or app_dir() / "config.json"
         if not path.exists():
             return cls()
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            # utf-8-sig: Notepad may save with a BOM
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (ValueError, OSError) as e:
+            log.error("cannot read %s: %s", path, e)
+            return cls()
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
     def save(self, path: Path | None = None) -> None:

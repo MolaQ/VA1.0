@@ -45,3 +45,10 @@ def test_agent_waits_for_setup_and_calibration(tmp_path, monkeypatch):
     }))
     monkeypatch.setattr(ag.Agent, "client", lambda self: _client(lambda req: httpx.Response(204)))
     assert a.tick() is False and states[-1] == "idle"
+
+
+def test_config_saved_by_notepad_with_bom(tmp_path):
+    (tmp_path / "c.json").write_bytes(b'\xef\xbb\xbf{"server": "http://x", "token": "1|a"}')
+    assert ag.AgentConfig.load(tmp_path / "c.json").token == "1|a"
+    (tmp_path / "bad.json").write_text("{nie json")
+    assert not ag.AgentConfig.load(tmp_path / "bad.json").ready
