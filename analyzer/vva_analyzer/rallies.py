@@ -55,6 +55,7 @@ class Rally:
     serve_side: str | None = None  # "near" / "far": where the serve came from (camera view)
     crossings: int | None = None
     serve_grade: str | None = None  # VVA grade of the serve: # ! =
+    server_number: int | None = None  # jersey number of our server (from the starting rotation)
     confidence: float = 0.5
 
     @property
@@ -139,6 +140,7 @@ def build(
     scores: list[ScoreEvent],
     s: Settings,
     our_side_set1: str = "near",
+    first_serve: dict[int, bool] | None = None,
 ) -> tuple[list[Rally], list[SetResult]]:
     """Main entry: rallies with winners/servers when the scoreboard was read, else from activity only."""
     if not scores:
@@ -190,7 +192,7 @@ def build(
                 crossings=crossings(cand) if cand else None,
                 confidence=0.8 if cand else 0.4,
             )
-            rally.server = _server(rallies, rally, our_side_set1)
+            rally.server = _server(rallies, rally, our_side_set1, first_serve)
             rally.serve_grade = _serve_grade(rally, s)
             rallies.append(rally)
 
@@ -210,6 +212,30 @@ def build(
 
     close_set()
     return rallies, sets
+
+
+def assign_servers(rallies: list[Rally], lineups: dict[int, list[int | None]]) -> int:
+    """Our server's number from the starting rotation of each set.
+
+    `lineups[set]` lists the jersey numbers in rotation positions I..VI. We rotate every time
+    we win a rally the opponent served (side-out), so the k-th rotation brings position k+1
+    to serve. Substitutions keep the position, so a substitute shows up as the starter's number.
+    Returns how many serves got a number.
+    """
+    done = 0
+    rot: dict[int, int] = {}
+    prev: dict[int, Rally] = {}
+    for r in rallies:
+        lineup = lineups.get(r.set)
+        k = rot.setdefault(r.set, 0)
+        p = prev.get(r.set)
+        if r.server == "us" and p is not None and p.server == "them":
+            k = rot[r.set] = k + 1
+        prev[r.set] = r
+        if r.server == "us" and lineup and len(lineup) == 6 and lineup[k % 6] is not None:
+            r.server_number = lineup[k % 6]
+            done += 1
+    return done
 
 
 def _missing_last_point(score: ScoreEvent, set_no: int, s: Settings) -> ScoreEvent | None:
@@ -239,10 +265,12 @@ def _match(candidates: list[Activity], used: set[int], after: float, at: float, 
     return best
 
 
-def _server(previous: list[Rally], rally: Rally, our_side_set1: str) -> str | None:
+def _server(previous: list[Rally], rally: Rally, our_side_set1: str, first_serve: dict[int, bool] | None = None) -> str | None:
     same_set = [r for r in previous if r.set == rally.set]
     if same_set:
         return same_set[-1].winner
+    if first_serve and first_serve.get(rally.set) is not None:
+        return "us" if first_serve[rally.set] else "them"
     if rally.serve_side is not None:
         return "us" if rally.serve_side == our_half(rally.set, our_side_set1) else "them"
     return None

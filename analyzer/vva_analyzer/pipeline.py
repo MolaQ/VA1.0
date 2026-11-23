@@ -24,6 +24,8 @@ class Job:
                  game_id: int | None = None, device: str | None = None, on_progress: Progress | None = None):
         self.cal, self.s, self.workdir = cal, s, workdir
         self.client, self.game_id, self.device = client, game_id, device
+        self.lineups: dict[int, list[int | None]] = {}  # set -> numbers in rotation positions I..VI
+        self.first_serve: dict[int, bool] = {}
         self.on_progress = on_progress or (lambda p, m: log.info("%3d%% %s", p, m))
         self.obs: list[ral.BallObs] = []
         self.readings: list[Reading] = []
@@ -42,6 +44,9 @@ class Job:
 
     def run(self, video: Path, reuse: bool = True, rescore: bool = False) -> dict:
         from . import video as vid
+
+        if self.client and self.game_id:
+            self._load_lineups()
 
         cache = self.workdir / f"{video.stem}.detections.json"
         if reuse and cache.exists():
@@ -156,7 +161,8 @@ class Job:
         candidates = ral.rally_candidates(ral.activity(ral.drop_static(live, s), s), s)
         candidates = ral.trim_with_whistles(candidates, self.whistles)
         scores = stabilise(self.readings, self.cal, s)
-        rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1)
+        rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1, self.first_serve)
+        numbered = ral.assign_servers(rallies, self.lineups)
         return {
             "sets": [asdict(x) for x in sets],
             "rallies": act.report(rallies),
@@ -170,6 +176,7 @@ class Job:
                 "score_changes": len(scores),
                 "whistles": len(self.whistles),
                 "rallies": len(rallies),
+                "serves_with_player": numbered,
                 "rallies_with_video_time": sum(1 for r in rallies if r.start is not None),
             },
         }
@@ -184,6 +191,24 @@ class Job:
             n = result["stats"]["rallies"]
             sets = ", ".join(f"{x['us']}:{x['them']}" for x in result["sets"]) or "brak tablicy wyników"
             self.client.progress(self.game_id, "completed", 100, f"Etap 1: {n} wymian, sety {sets}")
+
+    def _load_lineups(self) -> None:
+        """Starting rotations and first server per set, as entered in VVA (Match > Starting lineups)."""
+        assert self.client and self.game_id
+        try:
+            game = self.client.game(self.game_id).get("data", {})
+        except Exception as e:  # analysis still works without it
+            log.warning("lineups not loaded: %s", e)
+            return
+        for st in game.get("sets", []):
+            n = int(st["number"])
+            if st.get("we_serve_first") is not None:
+                self.first_serve[n] = bool(st["we_serve_first"])
+            by_pos = {int(e["rotation_position"]): e.get("number") for e in st.get("lineup", [])}
+            if by_pos:
+                self.lineups[n] = [by_pos.get(p) for p in range(1, 7)]
+        if self.lineups:
+            log.info("ustawienia z VVA / lineups: %s", {k: v for k, v in sorted(self.lineups.items())})
 
     # ------------------------------------------------------------------ cache
 

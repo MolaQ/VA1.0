@@ -14,14 +14,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $score_us
  * @property int $score_them
  * @property float|null $video_start
+ * @property bool|null $we_serve_first
  * @property-read Game $game
  */
-#[Fillable(['game_id', 'number', 'score_us', 'score_them', 'video_start'])]
+#[Fillable(['game_id', 'number', 'score_us', 'score_them', 'video_start', 'we_serve_first'])]
 class GameSet extends Model
 {
     protected function casts(): array
     {
-        return ['video_start' => 'float'];
+        return ['video_start' => 'float', 'we_serve_first' => 'boolean'];
     }
 
     /**

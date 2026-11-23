@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Game;
+use App\Models\GameSet;
 use App\Models\Player;
+use App\Models\SetLineup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
@@ -17,7 +19,7 @@ class GameController extends Controller
     {
         Gate::authorize('view', $game);
 
-        $game->load(['team', 'sets']);
+        $game->load(['team', 'sets.lineups.player']);
 
         return response()->json([
             'data' => [
@@ -32,7 +34,16 @@ class GameController extends Controller
                     'status' => $game->analysis_status->value,
                     'progress' => $game->analysis_progress,
                 ],
-                'sets' => $game->sets->map->only(['number', 'score_us', 'score_them', 'video_start'])->values(),
+                'sets' => $game->sets->map(fn (GameSet $set) => [
+                    ...$set->only(['number', 'score_us', 'score_them', 'video_start', 'we_serve_first']),
+                    // starting rotation: position 1 (serves first) .. 6
+                    'lineup' => $set->lineups->whereNotNull('rotation_position')->sortBy('rotation_position')
+                        ->map(fn (SetLineup $l) => [
+                            'rotation_position' => $l->rotation_position,
+                            'player_id' => $l->player_id,
+                            'number' => $l->player?->number,
+                        ])->values(),
+                ])->values(),
                 'roster' => Player::query()->forClub($game->club_id)->where('team_id', $game->team_id)->get()
                     ->map(fn (Player $p) => [
                         'id' => $p->id,

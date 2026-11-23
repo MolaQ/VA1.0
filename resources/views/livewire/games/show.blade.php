@@ -187,5 +187,43 @@
                 @endfor
             </div>
         </x-ui.card>
+
+        <x-ui.card class="mt-6" title="{{ __('Starting lineups') }}" subtitle="{{ __('Rotation at the start of each set: position I serves first. With it the AI knows who serves each rally.') }}">
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                @for ($i = 1; $i <= 5; $i++)
+                    @php
+                        $set = $game->sets->firstWhere('number', $i);
+                        $byPos = $set ? $set->lineups->whereNotNull('rotation_position')->pluck('player_id', 'rotation_position')->all() : [];
+                        $first = $set?->we_serve_first === null ? '' : ($set->we_serve_first ? 'us' : 'them');
+                    @endphp
+                    <div x-data="{ pos: @js((object) $byPos), first: @js($first) }" wire:key="lineup-{{ $i }}" class="rounded-xl border border-line bg-surface-2 p-3">
+                        <p class="label">Set {{ $i }}</p>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            {{-- court layout as seen from behind our end line: IV III II / V VI I --}}
+                            @foreach ([4, 3, 2, 5, 6, 1] as $p)
+                                <label class="block">
+                                    <span class="text-[10px] font-semibold uppercase text-muted">{{ ['', 'I', 'II', 'III', 'IV', 'V', 'VI'][$p] }}</span>
+                                    <select x-model.number="pos[{{ $p }}]" class="input !px-1.5 !py-1 text-sm tabular">
+                                        <option value="">–</option>
+                                        @foreach ($roster as $pl)
+                                            <option value="{{ $pl->id }}">{{ $pl->numberLabel() }}{{ $pl->isAnonymous() ? '' : ' '.$pl->short_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @endforeach
+                        </div>
+                        <label class="mt-2 block">
+                            <span class="text-[10px] font-semibold uppercase text-muted">{{ __('First serve') }}</span>
+                            <select x-model="first" class="input !px-1.5 !py-1 text-sm">
+                                <option value="">{{ __('AI decides') }}</option>
+                                <option value="us">{{ __('Us') }}</option>
+                                <option value="them">{{ __('Opponent') }}</option>
+                            </select>
+                        </label>
+                        <button type="button" x-on:click="$wire.saveLineup({{ $i }}, pos, first || null)" class="mt-2 w-full rounded-lg py-1 text-xs font-semibold text-brand-400 hover:bg-brand-500/10">{{ __('Save') }}</button>
+                    </div>
+                @endfor
+            </div>
+        </x-ui.card>
     @endif
 </div>

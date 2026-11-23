@@ -5,7 +5,9 @@ use App\Enums\Grade;
 use App\Enums\Role;
 use App\Events\GameActionsRecorded;
 use App\Events\GameAnalysisUpdated;
+use App\Livewire\Games\GameShow;
 use App\Models\Club;
+use App\Models\SetLineup;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 
@@ -133,4 +135,35 @@ it('returns the roster so the analyzer can map jersey numbers', function () {
         ->assertOk()
         ->assertJsonPath('data.youtube_id', 'dQw4w9WgXcQ')
         ->assertJsonCount(3, 'data.roster');
+});
+
+it('saves the starting rotation and gives it to the analyzer', function () {
+    ['club' => $club, 'game' => $game, 'players' => $players] = clubWithGame();
+    $admin = member($club, Role::Admin);
+
+    Livewire\Livewire::actingAs($admin)
+        ->test(GameShow::class, ['game' => $game])
+        ->call('saveLineup', 2, ['1' => $players[1]->id, '2' => $players[0]->id, '3' => ''], 'them');
+
+    $set = $game->sets()->where('number', 2)->first();
+    expect($set->we_serve_first)->toBeFalse()
+        ->and($set->lineups()->count())->toBe(2);
+
+    Sanctum::actingAs($admin, ['analysis:write']);
+    $this->getJson("/api/v1/games/{$game->id}")
+        ->assertOk()
+        ->assertJsonPath('data.sets.0.we_serve_first', false)
+        ->assertJsonPath('data.sets.0.lineup.0.rotation_position', 1)
+        ->assertJsonPath('data.sets.0.lineup.0.number', 13)
+        ->assertJsonPath('data.sets.0.lineup.1.number', 2);
+});
+
+it('rejects a player in two rotation positions', function () {
+    ['club' => $club, 'game' => $game, 'players' => $players] = clubWithGame();
+
+    Livewire\Livewire::actingAs(member($club, Role::Admin))
+        ->test(GameShow::class, ['game' => $game])
+        ->call('saveLineup', 1, ['1' => $players[0]->id, '2' => $players[0]->id]);
+
+    expect(SetLineup::count())->toBe(0);
 });

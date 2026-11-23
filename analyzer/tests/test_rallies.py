@@ -142,3 +142,24 @@ def test_missing_last_point_is_inferred():
     scores = [ScoreEvent(1.0, 20, 0)] + [ScoreEvent(5.0 + 10 * i, 20, i) for i in range(1, 25)] + [ScoreEvent(400.0, 0, 0)]
     _, sets = build([], scores, S)
     assert (sets[0].us, sets[0].them) == (20, 25)
+
+
+def test_server_numbers_follow_the_rotation():
+    # set 1: we receive first; points: them, us (side-out -> pos II serves), us, them, us (side-out -> pos III)
+    winners = ["them", "us", "us", "them", "us"]
+    us = them = 0
+    scores = []
+    for i, w in enumerate(winners):
+        us, them = (us + 1, them) if w == "us" else (us, them + 1)
+        scores.append(ScoreEvent(30.0 * (i + 1), us, them))
+    rallies, _ = build([], scores, S, first_serve={1: False})
+    from vva_analyzer.rallies import assign_servers
+    n = assign_servers(rallies, {1: [21, 30, 7, 55, 8, 14]})
+    assert [r.server for r in rallies] == ["them", "them", "us", "us", "them"]
+    assert [r.server_number for r in rallies] == [None, None, 30, 30, None]
+    assert n == 2
+    # one more side-out brings position III
+    scores.append(ScoreEvent(200.0, us + 1, them))
+    rallies, _ = build([], scores, S, first_serve={1: False})
+    assign_servers(rallies, {1: [21, 30, 7, 55, 8, 14]})
+    assert rallies[-1].server == "us" and rallies[-1].server_number == 7

@@ -196,6 +196,41 @@ class GameShow extends Component
         $this->toast(__('Set score saved.'));
     }
 
+    /**
+     * Starting rotation of one set (position 1 = serves first for us) and who served first.
+     *
+     * @param  array<int|string, int|string|null>  $positions  rotation position (1-6) => player id
+     */
+    public function saveLineup(int $number, array $positions, ?string $firstServe = null): void
+    {
+        Gate::authorize('update', $this->game);
+        abort_unless($number >= 1 && $number <= 5, 404);
+
+        $roster = Player::query()->forClub($this->game->club_id)->pluck('id')->all();
+        $set = $this->game->sets()->firstOrCreate(['number' => $number]);
+        $set->update(['we_serve_first' => match ($firstServe) {
+            'us' => true,
+            'them' => false,
+            default => null,
+        }]);
+
+        $chosen = collect($positions)
+            ->mapWithKeys(fn ($playerId, $pos) => [(int) $pos => (int) $playerId])
+            ->filter(fn (int $playerId, int $pos) => $pos >= 1 && $pos <= 6 && in_array($playerId, $roster, true));
+
+        if ($chosen->duplicates()->isNotEmpty()) {
+            $this->toast(__('A player can only be in one position.'), 'error');
+
+            return;
+        }
+
+        $set->lineups()->whereNotNull('rotation_position')->delete();
+        foreach ($chosen as $pos => $playerId) {
+            $set->lineups()->updateOrCreate(['player_id' => $playerId], ['rotation_position' => $pos, 'is_substitute' => false]);
+        }
+        $this->toast(__('Lineup saved.'));
+    }
+
     public function reanalyze(): void
     {
         Gate::authorize('update', $this->game);
@@ -206,7 +241,7 @@ class GameShow extends Component
 
     public function render(GameStatsCalculator $calculator): View
     {
-        $game = $this->game->load(['team', 'sets']);
+        $game = $this->game->load(['team', 'sets.lineups']);
         $user = $this->user();
         $visible = Visibility::playerIdsFor($user, $game);
         $canCode = $user->can('code', $game);
@@ -216,7 +251,7 @@ class GameShow extends Component
             'showTotals' => $visible === null,
             'canCode' => $canCode,
             'canEdit' => $user->can('update', $game),
-            'roster' => $canCode
+            'roster' => $canCode || $user->can('update', $game)
                 ? Player::query()->forClub($game->club_id)->where('team_id', $game->team_id)->where('is_active', true)->orderBy('number')->get()
                 : collect(),
             'timeline' => $game->actions()
