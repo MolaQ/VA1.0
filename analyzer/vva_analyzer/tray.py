@@ -135,6 +135,8 @@ class TrayApp:
         self.agent = Agent(self.cfg, self.changed)
         self.icon = None
         self.dialog = threading.Lock()
+        self.gpu = "Karta: sprawdzam..."
+        self.gpu_ok: bool | None = None  # None while checking
 
     def changed(self, st: AgentState) -> None:
         if self.icon is None:
@@ -203,6 +205,41 @@ class TrayApp:
             self.dialog.release()
             self.agent.wake.set()
 
+    def check_gpu(self) -> None:
+        try:
+            import torch
+
+            self.gpu_ok = torch.cuda.is_available()
+            if self.gpu_ok:
+                self.gpu = f"Karta: {torch.cuda.get_device_name(0)}"
+            elif torch.version.cuda:
+                self.gpu = "Karta: CUDA zainstalowana, brak sterownika NVIDIA"
+            else:
+                self.gpu = "Karta: nie używana (PyTorch na procesor)"
+        except Exception as e:
+            self.gpu_ok = False
+            self.gpu = f"Karta: błąd PyTorch ({e.__class__.__name__})"
+        log.info(self.gpu)
+        if self.icon:
+            self.icon.update_menu()
+
+    def reinstall_gpu(self, *_):
+        """Re-run the installer script with the CUDA version of PyTorch, then start again."""
+        from pathlib import Path
+
+        app = Path(sys.executable).resolve().parents[2]  # ...\VVA Analyzer\venv\Scripts\pythonw.exe
+        script = app / "install.ps1"
+        if not script.exists():
+            threading.Thread(target=info, args=(f"Nie znaleziono {script}. Uruchom instalator ponownie.", True),
+                             daemon=True).start()
+            return
+        subprocess.Popen(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
+             "-AppDir", str(app), "-Gpu", "-StartTray"],
+            creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+        )
+        self.quit()
+
     def quit(self, *_):
         self.agent.stop.set()
         self.agent.wake.set()
@@ -217,17 +254,20 @@ class TrayApp:
         item = pystray.MenuItem
         menu = pystray.Menu(
             item(lambda _: self.agent.state.message[:80], None, enabled=False),
+            item(lambda _: self.gpu[:80], None, enabled=False),
             pystray.Menu.SEPARATOR,
             item("Otwórz VVA", self.open_site, default=True),
             item("Sprawdź teraz", self.check_now),
             item("Kalibruj kamerę…", self.calibrate),
             item("Ustawienia…", self.settings),
             item("Pokaż log", self.open_log),
+            item("Przeinstaluj z GPU (NVIDIA)", self.reinstall_gpu, visible=lambda _: self.gpu_ok is False),
             pystray.Menu.SEPARATOR,
             item("Zakończ", self.quit),
         )
         self.icon = pystray.Icon("vva-analyzer", icon_image("idle"), "VVA Analyzer", menu)
         threading.Thread(target=self.agent.run_forever, daemon=True).start()
+        threading.Thread(target=self.check_gpu, daemon=True).start()
         if not self.cfg.ready:
             self.settings()
         self.icon.run()

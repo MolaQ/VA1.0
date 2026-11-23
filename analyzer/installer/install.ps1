@@ -2,8 +2,10 @@
 # Run by the installer (VVA-Analyzer-Setup.exe); can also be run by hand:
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -AppDir "C:\...\VVA Analyzer"
 param(
-    [string]$AppDir = (Split-Path -Parent $PSScriptRoot),
-    [switch]$Cpu
+    [string]$AppDir = $PSScriptRoot,
+    [switch]$Cpu,        # force the processor version of PyTorch
+    [switch]$Gpu,        # force the NVIDIA (CUDA) version, even if no card is detected
+    [switch]$StartTray   # start VVA Analyzer when done (used by "Przeinstaluj z GPU" in the tray)
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -11,6 +13,46 @@ $Host.UI.RawUI.WindowTitle = 'VVA Analyzer: instalacja'
 Start-Transcript -Path (Join-Path $AppDir 'install.log') -Append | Out-Null
 
 function Step($text) { Write-Host ""; Write-Host "==> $text" -ForegroundColor Cyan }
+
+function Test-NvidiaGpu {
+    # 1) nvidia-smi (on PATH, in System32 or the old NVSMI folder) works once the driver is installed
+    $smi = @('nvidia-smi', "$env:SystemRoot\System32\nvidia-smi.exe", "$env:ProgramFiles\NVIDIA Corporation\NVSMI\nvidia-smi.exe")
+    foreach ($s in $smi) {
+        try {
+            $out = & $s -L 2>$null
+            if ($LASTEXITCODE -eq 0 -and "$out" -match 'GPU') { Write-Host "Karta: $out"; return $true }
+        } catch {}
+    }
+    # 2) the list of graphics cards in Windows (works even while the driver is being updated)
+    try {
+        $cards = Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' }
+        if ($cards) { Write-Host "Karta: $($cards[0].Name)"; return $true }
+    } catch {}
+    return $false
+}
+
+function Install-Torch($vpy, [bool]$useGpu) {
+    $current = & $vpy -c "import torch; print('cuda' if torch.version.cuda else 'cpu')" 2>$null
+    if ($LASTEXITCODE -ne 0) { $current = '' }
+    $want = if ($useGpu) { 'cuda' } else { 'cpu' }
+    if ($current -eq $want) { Write-Host "PyTorch ($want) już zainstalowany."; return }
+    if ($current) {
+        Step "Wymieniam PyTorch ($current) na wersję $want"
+        & $vpy -m pip uninstall -y torch torchvision
+    }
+    if ($useGpu) {
+        Step 'Instaluję PyTorch dla karty NVIDIA (ok. 3 GB, to potrwa kilka minut)'
+        foreach ($cu in @('cu126', 'cu128', 'cu124')) {
+            & $vpy -m pip install torch torchvision --index-url "https://download.pytorch.org/whl/$cu"
+            if ($LASTEXITCODE -eq 0) { return }
+            Write-Host "Wersja $cu niedostępna, próbuję kolejnej..." -ForegroundColor Yellow
+        }
+        throw 'Instalacja PyTorch (CUDA) nie powiodła się.'
+    }
+    Step 'Instaluję PyTorch na procesor (analiza będzie wolniejsza)'
+    & $vpy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    if ($LASTEXITCODE -ne 0) { throw 'Instalacja PyTorch nie powiodła się.' }
+}
 
 function Find-Python312 {
     try {
@@ -24,6 +66,11 @@ function Find-Python312 {
 }
 
 try {
+    # a running VVA Analyzer keeps PyTorch files open: close it first
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith((Join-Path $AppDir 'venv'), 'OrdinalIgnoreCase') } |
+        ForEach-Object { Write-Host "Zamykam działający VVA Analyzer (PID $($_.ProcessId))"; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
     Step 'Szukam Pythona 3.12'
     $py = Find-Python312
     if (-not $py) {
@@ -44,18 +91,10 @@ try {
     }
     & $vpy -m pip install --upgrade pip --quiet
 
-    $gpu = $false
-    if (-not $Cpu) {
-        try { & nvidia-smi -L 2>$null | Out-Null; $gpu = ($LASTEXITCODE -eq 0) } catch { $gpu = $false }
-    }
-    if ($gpu) {
-        Step 'Instaluję PyTorch dla karty NVIDIA (ok. 3 GB, to potrwa kilka minut)'
-        & $vpy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-    } else {
-        Step 'Nie wykryto karty NVIDIA: instaluję PyTorch na procesor (analiza będzie wolniejsza)'
-        & $vpy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-    }
-    if ($LASTEXITCODE -ne 0) { throw 'Instalacja PyTorch nie powiodła się.' }
+    Step 'Sprawdzam kartę graficzną'
+    $gpu = if ($Gpu) { $true } elseif ($Cpu) { $false } else { Test-NvidiaGpu }
+    if (-not $gpu) { Write-Host 'Nie znaleziono karty NVIDIA.' -ForegroundColor Yellow }
+    Install-Torch $vpy $gpu
 
     Step 'Instaluję VVA Analyzer'
     & $vpy -m pip install --upgrade "$(Join-Path $AppDir 'app')[vision,tray]"
@@ -70,6 +109,10 @@ try {
 
     Step 'Gotowe!'
     Write-Host 'VVA Analyzer uruchomi się za chwilę (ikona przy zegarze).' -ForegroundColor Green
+    if ($gpu) { Write-Host 'Jeśli powyżej jest "GPU: False", zainstaluj/aktualizuj sterownik NVIDIA i uruchom ponownie komputer.' }
+    if ($StartTray) {
+        Start-Process (Join-Path $venv 'Scripts\pythonw.exe') -ArgumentList '-m vva_analyzer tray' -WorkingDirectory $data
+    }
     Start-Sleep -Seconds 3
     Stop-Transcript | Out-Null
     exit 0
