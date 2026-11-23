@@ -47,8 +47,10 @@ def load_audio(path: str, rate: int = 16000) -> np.ndarray:
     """Mono float32 audio via ffmpeg (must be on PATH)."""
     import subprocess
 
+    from .video import ffmpeg_exe
+
     raw = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(rate), "-f", "s16le", "-"],
+        [ffmpeg_exe(), "-v", "error", "-i", path, "-ac", "1", "-ar", str(rate), "-f", "s16le", "-"],
         check=True, capture_output=True,
     ).stdout
     return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0

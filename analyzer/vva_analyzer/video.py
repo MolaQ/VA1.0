@@ -6,17 +6,26 @@ from collections.abc import Iterator
 from pathlib import Path
 
 
-def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
-    """Download a YouTube video (only recordings you own or may analyse) as mp4."""
+def ffmpeg_exe() -> str:
+    """ffmpeg from PATH, else the copy bundled with the imageio-ffmpeg package."""
     import shutil
 
-    from yt_dlp import YoutubeDL
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    try:
+        import imageio_ffmpeg
 
-    if shutil.which("ffmpeg") is None:
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception as e:  # pragma: no cover - depends on the machine
         raise SystemExit(
-            "ffmpeg nie jest widoczny w tym terminalu (ffmpeg not found on PATH).\n"
-            "Zainstaluj go (README: Instalacja, krok 2), otwórz NOWY terminal i sprawdź `ffmpeg -version`."
-        )
+            "ffmpeg nie znaleziony (ffmpeg not found). Uruchom: python -m pip install imageio-ffmpeg"
+        ) from e
+
+
+def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
+    """Download a YouTube video (only recordings you own or may analyse) as mp4."""
+    from yt_dlp import YoutubeDL
 
     workdir.mkdir(parents=True, exist_ok=True)
     opts = {
@@ -25,6 +34,7 @@ def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
         "outtmpl": str(workdir / "%(id)s.%(ext)s"),
         "quiet": True,
         "noprogress": True,
+        "ffmpeg_location": ffmpeg_exe(),
     }
     with YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
