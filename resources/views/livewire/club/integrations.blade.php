@@ -43,7 +43,7 @@
             </x-ui.card>
         </div>
 
-        <x-ui.card title="{{ __('API for the AI module') }}" subtitle="{{ __('Authorization') }}: Bearer &lt;token&gt;" class="xl:col-span-3">
+        <x-ui.card title="{{ __('API for the AI module') }}" subtitle="{{ __('Authorization') }}: Bearer <token>" class="xl:col-span-3">
             <div class="space-y-4 text-sm">
                 @foreach ([
                     ['GET', '/games/{id}', __('Match metadata and roster (jersey numbers → player ids).')],
