@@ -75,3 +75,8 @@ class Settings:
     # Scoreboard OCR
     ocr_every_s: float = 1.0
     ocr_stable_reads: int = 2
+    ocr_revert_s: float = 40.0  # a score undone within this time was a misread or a correction
+    ocr_max_jump: int = 6  # missed reads: a side may jump forward at most this many points
+    set_reset_min: int = 14  # 0:0 is a new set only after one side had at least this many points
+    set_points: int = 25
+    tiebreak_points: int = 15

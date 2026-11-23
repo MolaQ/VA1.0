@@ -104,3 +104,41 @@ def test_stabilise_needs_consistent_reads():
     ]]
     events = stabilise(reads, cal, S)
     assert [(e.t, e.us, e.them) for e in events] == [(1, 1, 0), (5, 1, 1), (8, 2, 1)]
+
+
+def _reads(seq, every=1.0, repeat=3):
+    """Each (left, right) held for `repeat` one-second reads."""
+    out, t = [], 0.0
+    for left, right in seq:
+        for _ in range(repeat):
+            out.append(Reading(t, left, right))
+            t += every
+    return out
+
+
+def test_stabilise_decodes_typical_ocr_mistakes():
+    cal = Calibration(our_score="left")
+    # 11:9 -> 72 means 12, 51 means 5 (border), 3 means 13 (lost tens digit)
+    seq = [(0, 0)] + [(i, i // 3) for i in range(1, 12)] + [(72, 4), (12, 51), (3, 5)]
+    events = stabilise(_reads(seq, repeat=8), cal, S)
+    assert [(e.us, e.them) for e in events][-3:] == [(12, 4), (12, 5), (13, 5)]
+
+
+def test_stabilise_drops_quick_reverts_and_warmup_flicker():
+    cal = Calibration(our_score="left")
+    seq = [(0, 0), (1, 0), (0, 0), (1, 0), (0, 0)] + [(0, 0)] * 20 + [(1, 0), (1, 1)]
+    events = stabilise(_reads(seq, repeat=5), cal, S)
+    assert [(e.us, e.them) for e in events] == [(1, 0), (1, 1)]
+
+
+def test_stabilise_new_set_with_stray_five():
+    cal = Calibration(our_score="left")
+    seq = [(i, i) for i in range(0, 25)] + [(25, 23), (50, 0), (50, 1), (52, 1)]
+    events = stabilise(_reads(seq, repeat=8), cal, S)
+    assert [(e.us, e.them) for e in events][-4:] == [(25, 23), (0, 0), (0, 1), (2, 1)]
+
+
+def test_missing_last_point_is_inferred():
+    scores = [ScoreEvent(1.0, 20, 0)] + [ScoreEvent(5.0 + 10 * i, 20, i) for i in range(1, 25)] + [ScoreEvent(400.0, 0, 0)]
+    _, sets = build([], scores, S)
+    assert (sets[0].us, sets[0].them) == (20, 25)

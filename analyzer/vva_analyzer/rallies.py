@@ -155,14 +155,8 @@ def build(
             first = next((r.start for r in rallies if r.set == set_no and r.start is not None), None)
             sets.append(SetResult(set_no, prev.us, prev.them, first))
 
-    for ev in scores:
-        if ev.us == 0 and ev.them == 0 and _finished(prev):
-            if prev.us or prev.them:
-                close_set()
-                set_no += 1
-            prev = ScoreEvent(ev.t, 0, 0)
-            continue
-
+    def advance(ev: ScoreEvent) -> None:
+        nonlocal prev
         d_us, d_them = ev.us - prev.us, ev.them - prev.them
 
         if d_us < 0 or d_them < 0:
@@ -173,7 +167,7 @@ def build(
                     if idx is not None:
                         rallies.pop(idx)
             prev = ScoreEvent(ev.t, ev.us, ev.them)
-            continue
+            return
 
         points = ["us"] * d_us + ["them"] * d_them
         for i, winner in enumerate(points):
@@ -202,8 +196,32 @@ def build(
 
         prev = ScoreEvent(ev.t, ev.us, ev.them)
 
+    for ev in scores:
+        if ev.us == 0 and ev.them == 0 and _finished(prev):
+            if prev.us or prev.them:
+                last = _missing_last_point(prev, set_no, s)
+                if last is not None:
+                    advance(last)  # the overlay was reset before the winning point was read
+                close_set()
+                set_no += 1
+            prev = ScoreEvent(ev.t, 0, 0)
+            continue
+        advance(ev)
+
     close_set()
     return rallies, sets
+
+
+def _missing_last_point(score: ScoreEvent, set_no: int, s: Settings) -> ScoreEvent | None:
+    """20:24 followed by 0:0 means the set ended 20:25, the last update was just not read."""
+    target = s.tiebreak_points if set_no == 5 else s.set_points
+    hi, lo = max(score.us, score.them), min(score.us, score.them)
+    if hi >= target and hi - lo >= 2:
+        return None
+    if hi + 1 >= target and hi + 1 - lo >= 2:
+        us_lead = score.us > score.them
+        return ScoreEvent(score.t + 1.0, score.us + us_lead, score.them + (not us_lead))
+    return None
 
 
 def _finished(score: ScoreEvent, min_points: int = 15) -> bool:
