@@ -1,6 +1,6 @@
 [project]
 name = "vva-analyzer"
-version = "0.1.0"
+version = "0.2.0"
 description = "VVA automatic volleyball video analysis (stage 1: rallies, score, serve)"
 requires-python = ">=3.10"
 dependencies = [
@@ -15,6 +15,7 @@ dependencies = [
 # GPU detection + OCR (torch with CUDA is installed separately, see README).
 vision = ["ultralytics>=8.3", "easyocr>=1.7"]
 server = ["fastapi>=0.110", "uvicorn>=0.29"]
+tray = ["pystray>=0.19", "pillow>=10"]
 dev = ["pytest>=8"]
 
 [project.scripts]

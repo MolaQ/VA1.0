@@ -38,6 +38,11 @@ class VvaClient:
                 time.sleep(2 ** attempt)
         raise RuntimeError("unreachable")
 
+    def claim(self) -> dict | None:
+        """Next match queued for analysis in this token's club, or None."""
+        r = self._call("POST", "agent/claim")
+        return None if r.status_code == 204 or not r.content else r.json().get("data")
+
     def me(self) -> dict:
         return self._call("GET", "me").json()
 

@@ -39,9 +39,18 @@ def _print_progress(d: dict) -> None:
         print("  pobrane / downloaded", flush=True)
 
 
-def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
-    """Download a YouTube video (only recordings you own or may analyse) as mp4."""
+def download(url: str, workdir: Path, max_height: int = 1080, on_progress=None) -> Path:
+    """Download a YouTube video (only recordings you own or may analyse) as mp4.
+
+    `on_progress(percent)` is called as the download advances (the agent reports it to VVA).
+    """
     from yt_dlp import YoutubeDL
+
+    def hook(d: dict) -> None:
+        _print_progress(d)
+        total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+        if on_progress and d.get("status") == "downloading" and total:
+            on_progress(int(100 * d.get("downloaded_bytes", 0) / total))
 
     workdir.mkdir(parents=True, exist_ok=True)
     opts = {
@@ -50,7 +59,7 @@ def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
         "outtmpl": str(workdir / "%(id)s.%(ext)s"),
         "quiet": True,
         "noprogress": True,
-        "progress_hooks": [_print_progress],
+        "progress_hooks": [hook],
         "ffmpeg_location": ffmpeg_exe(),
     }
     with YoutubeDL(opts) as ydl:

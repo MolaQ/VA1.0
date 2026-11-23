@@ -6,3 +6,4 @@ work/
 *.pt
 calibration*.json
 !calibration.example.json
+installer/Output/

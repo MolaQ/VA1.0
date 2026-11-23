@@ -1,5 +1,7 @@
 # VVA Analyzer: automatyczna analiza wideo (etap 1)
 
+> **Program na Windows z ikoną w zasobniku (agent analizy):** zobacz [WINDOWS.md](WINDOWS.md). Poniżej opis dla programistów i ręczne uruchamianie.
+
 Program uruchamiany na komputerze z kartą NVIDIA. Ogląda nagranie meczu ze stałej kamery,
 czyta wynik z nakładki (np. Sportcam) i wysyła do VVA:
 

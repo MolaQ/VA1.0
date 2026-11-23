@@ -66,6 +66,13 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument("--count", type=int, default=40)
     f.add_argument("--workdir", default="work")
 
+    g = sub.add_parser("agent", help="take queued matches from VVA and analyse them (no window)")
+    g.add_argument("--server", help="VVA address, e.g. http://localhost/molak/VVA/public (saved for next time)")
+    g.add_argument("--token", default=os.environ.get("VVA_API_TOKEN"), help="club API token (saved for next time)")
+    g.add_argument("--once", action="store_true", help="analyse at most one match and exit")
+
+    sub.add_parser("tray", help="the agent with an icon in the Windows tray")
+
     s = sub.add_parser("serve", help="run as a service that VVA sends matches to")
     s.add_argument("--host", default="127.0.0.1"), s.add_argument("--port", type=int, default=8765)
     s.add_argument("--calibration", default="calibration.json")
@@ -76,7 +83,8 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
     workdir = Path(getattr(args, "workdir", "work"))
-    workdir.mkdir(parents=True, exist_ok=True)
+    if hasattr(args, "workdir"):
+        workdir.mkdir(parents=True, exist_ok=True)
 
     if args.cmd == "calibrate":
         from . import calibrate, video as vid
@@ -156,6 +164,29 @@ def main(argv: list[str] | None = None) -> int:
                     y0, y1 = int(max(0, (first.y - 0.05) * h)), int(min(h, (first.y + 0.25) * h))
                     cv2.imwrite(str(out / f"{name}_crop.png"), frame[y0:y1, x0:x1])
         print(f"Zapisano {len(ours)} zagrywek do {out} (klatka 1 s przed i w chwili zagrywki, plus wycinek wokol pilki).")
+        return 0
+
+    if args.cmd == "agent":
+        from .agent import Agent, AgentConfig
+        cfg = AgentConfig.load()
+        if args.server or args.token:
+            cfg.server = args.server or cfg.server
+            cfg.token = args.token or cfg.token
+            cfg.save()
+        agent = Agent(cfg)
+        if args.once:
+            agent.tick()
+            return 0
+        print("Agent VVA działa (Ctrl+C kończy). / VVA agent running.")
+        try:
+            agent.run_forever()
+        except KeyboardInterrupt:
+            pass
+        return 0
+
+    if args.cmd == "tray":
+        from .tray import main as tray_main
+        tray_main()
         return 0
 
     if args.cmd == "serve":
