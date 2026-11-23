@@ -7,8 +7,10 @@ import './echo';
 import './analytics';
 import './pwa';
 import './realtime';
+import coder from './coder';
 import ytPlayer from './youtube-player';
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('ytPlayer', ytPlayer);
+    window.Alpine.data('coder', coder);
 });

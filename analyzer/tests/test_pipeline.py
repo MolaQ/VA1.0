@@ -19,6 +19,9 @@ class FakeClient:
     def post_actions(self, game_id, actions):
         self.calls.append(("actions", len(actions)))
 
+    def post_rallies(self, game_id, rallies):
+        self.calls.append(("rallies", rallies))
+
 
 def test_publish_sends_sets_actions_and_completion(tmp_path: Path):
     client = FakeClient()
@@ -32,6 +35,9 @@ def test_publish_sends_sets_actions_and_completion(tmp_path: Path):
     assert result["stats"]["rallies"] == 1
     assert ("set", 1, 1, 0) in client.calls
     assert ("actions", 1) in client.calls  # first serve of the set came from our (near) half
+    rallies = next(c[1] for c in client.calls if c[0] == "rallies")
+    assert rallies[0]["set"] == 1 and rallies[0]["rally"] == 1
+    assert rallies[0]["server"] == "us" and rallies[0]["winner"] == "us"
     assert client.calls[-1][:2] == ("progress", "completed")
 
 

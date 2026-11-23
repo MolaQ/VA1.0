@@ -62,6 +62,13 @@ class VvaClient:
             body["video_start"] = round(video_start, 2)
         self._call("PUT", f"games/{game_id}/sets/{number}", json=body)
 
+    def post_rallies(self, game_id: int, rallies: list[dict], chunk: int = 500) -> int:
+        """Who served and who won each rally: feeds side-out / break-point and rotation stats."""
+        saved = 0
+        for i in range(0, len(rallies), chunk):
+            saved += int(self._call("POST", f"games/{game_id}/rallies", json={"rallies": rallies[i:i + chunk]}).json().get("saved", 0))
+        return saved
+
     def post_actions(self, game_id: int, actions: list[dict], chunk: int = 200) -> dict:
         totals = {"created": 0, "updated": 0, "skipped": []}
         for i in range(0, len(actions), chunk):

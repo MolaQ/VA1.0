@@ -71,6 +71,21 @@ export default (videoId) => ({
         return this.ready ? this.player.getCurrentTime() : null;
     },
 
+    togglePlay() {
+        if (!this.ready) {
+            return;
+        }
+
+        // 1 = playing
+        this.player.getPlayerState() === 1 ? this.player.pauseVideo() : this.player.playVideo();
+    },
+
+    nudge(seconds) {
+        if (this.ready) {
+            this.player.seekTo(Math.max(0, this.player.getCurrentTime() + seconds), true);
+        }
+    },
+
     tick() {
         if (!this.ready || this.clipEnd === null) {
             return;

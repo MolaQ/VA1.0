@@ -187,6 +187,9 @@ class Job:
             self.client.put_set(self.game_id, st["number"], st["us"], st["them"], st["video_start"])
         if result["actions"]:
             self.client.post_actions(self.game_id, result["actions"])
+        outcomes = act.rally_outcomes(result["rallies"])
+        if outcomes:
+            self.client.post_rallies(self.game_id, outcomes)
         if final:
             n = result["stats"]["rallies"]
             sets = ", ".join(f"{x['us']}:{x['them']}" for x in result["sets"]) or "brak tablicy wyników"

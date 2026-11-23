@@ -27,6 +27,14 @@ class GamePolicy
             && $user->children()->where('players.club_id', $game->club_id)->exists();
     }
 
+    /**
+     * Full match report (team tactics, every player): staff and players, not parents.
+     */
+    public function report(User $user, Game $game): bool
+    {
+        return $user->hasRole($game->club_id, Role::Admin, Role::Trainer, Role::Player);
+    }
+
     public function create(User $user, Club $club): bool
     {
         return $user->isStaffOf($club);
