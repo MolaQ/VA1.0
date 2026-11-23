@@ -54,12 +54,12 @@ final class RallyBuilder
 
         foreach ($numbers as $n) {
             $touches = $byRally->get($n, collect())
-                ->sortBy([fn ($a, $b) => ($a->video_time ?? INF) <=> ($b->video_time ?? INF), fn ($a, $b) => $a->id <=> $b->id])
+                ->sort(fn (GameAction $a, GameAction $b) => [$a->video_time ?? INF, $a->id] <=> [$b->video_time ?? INF, $b->id])
                 ->values();
             $rally = new Rally((int) $set->number, $n, $touches);
             $known = $explicit->get($set->id.':'.$n);
-            $rally->server = $known?->server ?? $rally->inferredServer();
-            $rally->winner = $known?->winner ?? $rally->inferredWinner();
+            $rally->server = $known->server ?? $rally->inferredServer();
+            $rally->winner = $known->winner ?? $rally->inferredWinner();
             $list[] = $rally;
         }
 

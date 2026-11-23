@@ -190,40 +190,46 @@ final class MatchReportBuilder
         }
 
         $won = $rally->winner === Rally::US;
-        $set = &$report->setPhases[$rally->set];
-        $rot = $rally->rotation !== null ? $rally->rotation : null;
+        $side = $won ? 'us' : 'them';
+        $phase = match (true) {
+            $rally->isSideOut() => 'so',
+            $rally->isBreakPoint() => 'bp',
+            default => null,
+        };
 
-        $set[$won ? 'us' : 'them']++;
+        $set = $report->setPhases[$rally->set];
+        $set[$side]++;
 
-        if ($rot !== null) {
-            $report->rotations[$rot][$won ? 'us' : 'them']++;
+        if ($phase !== null) {
+            $set[$phase]->add($won);
         }
 
-        if ($rally->isSideOut()) {
-            $report->sideOut->add($won);
-            $set['so']->add($won);
+        $report->setPhases[$rally->set] = $set;
 
-            if ($rot !== null) {
-                $report->rotations[$rot]['so']->add($won);
+        if ($rally->rotation !== null) {
+            $rot = $report->rotations[$rally->rotation];
+            $rot[$side]++;
+
+            if ($phase !== null) {
+                $rot[$phase]->add($won);
             }
+
+            $report->rotations[$rally->rotation] = $rot;
+        }
+
+        if ($phase === 'so') {
+            $report->sideOut->add($won);
 
             if ($reception = $rally->first(Skill::Reception)) {
                 $report->receptionToSideOut[$reception->grade->value]['so']->add($won);
             }
-        } elseif ($rally->isBreakPoint()) {
+        } elseif ($phase === 'bp') {
             $report->breakPoint->add($won);
-            $set['bp']->add($won);
-
-            if ($rot !== null) {
-                $report->rotations[$rot]['bp']->add($won);
-            }
 
             if ($serve = $rally->first(Skill::Serve)) {
                 $report->serveToBreak[$serve->grade->value]->add($won);
             }
         }
-
-        unset($set);
     }
 
     /** How the point was won or lost: the deciding touch, else the opponent. */
