@@ -32,8 +32,10 @@ class FrameController extends Controller
             'frames.*.players.*.f' => ['nullable', 'numeric'],
         ]);
 
+        /** @var list<array{t: float|int|string, players: array<int, mixed>}> $frames */
+        $frames = $data['frames'];
         $now = now();
-        $rows = collect($data['frames'])
+        $rows = collect($frames)
             ->keyBy(fn (array $f) => number_format((float) $f['t'], 2, '.', ''))
             ->map(fn (array $f, string $t) => [
                 'game_id' => $game->id,

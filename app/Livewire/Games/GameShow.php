@@ -250,7 +250,7 @@ class GameShow extends Component
 
         return [
             'frames' => $this->game->frames()->whereBetween('t', [$from, $to])->orderBy('t')->get()
-                ->map(fn (GameFrame $f) => $f->toClient())->all(),
+                ->map(fn (GameFrame $f) => $f->toClient())->values()->all(),
             'labels' => $this->game->tracks()->get()
                 ->mapWithKeys(fn (GameTrack $l) => [$l->track => ['team' => $l->team, 'n' => $l->number]])->all(),
         ];
@@ -302,7 +302,7 @@ class GameShow extends Component
                 'label' => trim(($a->player?->numberLabel() ?? '?').' · '.$a->skill->label().' '.$a->grade->value),
                 'from' => $a->from_x !== null ? [$a->from_x, $a->from_y] : null,
                 'to' => $a->to_x !== null ? [$a->to_x, $a->to_y] : null,
-            ])->all();
+            ])->values()->all();
     }
 
     /**
