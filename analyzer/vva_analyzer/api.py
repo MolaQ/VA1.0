@@ -21,9 +21,18 @@ class VvaClient:
                 r = self.http.request(method, url, **kw)
                 if r.status_code == 429 or r.status_code >= 500:
                     raise httpx.HTTPStatusError("retry", request=r.request, response=r)
+                if r.status_code == 401:
+                    raise SystemExit(
+                        "VVA odrzucilo token (401). Sprawdz VVA_API_TOKEN (caly, razem z '1|') i czy nie zostal uniewazniony.\n"
+                        "VVA rejected the token (401): check VVA_API_TOKEN and that it was not revoked."
+                    )
+                if r.status_code == 403:
+                    raise SystemExit(f"Brak uprawnien do {url} (403): token musi nalezec do klubu tego meczu.")
                 r.raise_for_status()
                 return r
-            except (httpx.TransportError, httpx.HTTPStatusError):
+            except (httpx.TransportError, httpx.HTTPStatusError) as e:
+                if isinstance(e, httpx.HTTPStatusError) and e.response.status_code < 500 and e.response.status_code != 429:
+                    raise
                 if attempt == 3:
                     raise
                 time.sleep(2 ** attempt)
