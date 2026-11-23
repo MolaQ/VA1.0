@@ -55,9 +55,10 @@ Za każdym razem zaczynasz od aktywacji środowiska: `cd analyzer` i `.venv\Scri
 python -m vva_analyzer calibrate --url "https://www.youtube.com/watch?v=XCXJATWV9O4" --at 300
 ```
 
-- Kliknij 4 końce **linii ataku** (linie 3 m od siatki): najpierw linia na połowie, na której **my** gramy w 1. secie,
-  koniec przy dalszej linii bocznej, potem przy bliższej; następnie linia ataku drugiej połowy: koniec przy bliższej
-  linii bocznej, potem przy dalszej. Backspace cofa punkt.
+- Program sam znajduje **linie ataku** (3 m od siatki) i zaznacza ich końce. Popraw przeciągając punkt myszą,
+  jeśli trzeba. Napis „MY / US” ma stać na połowie, na której gramy w 1. secie; klawisz **S** przenosi go na drugą
+  połowę. **Enter** zatwierdza, **C** czyści punkty, by kliknąć je ręcznie (lewa linia: koniec dalszy, bliższy;
+  prawa: bliższy, dalszy).
 - Zaznacz prostokątem punkty pierwszej drużyny na nakładce (lewej albo górnej) i Enter, potem drugiej i Enter.
 - W terminalu odpowiedz, czy nasza drużyna jest na nakładce pierwsza (`l`), czy druga (`r`).
 
