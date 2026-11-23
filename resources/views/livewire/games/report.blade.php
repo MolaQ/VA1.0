@@ -46,6 +46,7 @@
                     @foreach ($game->sets as $set)<span class="rounded bg-surface-3 px-1.5 py-0.5">{{ $set->score_us }}:{{ $set->score_them }}</span>@endforeach
                 </p>
             </div>
+            <x-ui.button class="no-print" size="sm" variant="secondary" icon="chart" :href="route('games.compare', ['team' => $game->team_id])">{{ __('Compare matches') }}</x-ui.button>
             <x-ui.button class="no-print" size="sm" variant="secondary" icon="download" x-on:click="window.print()">{{ __('PDF / Print') }}</x-ui.button>
         </div>
     </div>

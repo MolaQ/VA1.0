@@ -507,5 +507,21 @@
     "Number unknown": "Numer nieznany",
     "Player not recognised": "Nie rozpoznano zawodnika",
     "Low AI confidence": "Niska pewność AI",
-    "Marked as unclear": "Oznaczone jako niejasne"
+    "Marked as unclear": "Oznaczone jako niejasne",
+    "Reports": "Raporty",
+    "Match comparison": "Porównanie meczów",
+    "Pick up to 10 matches: the same numbers side by side, the total and the trend of the latest match.": "Wybierz do 10 meczów: te same liczby obok siebie, suma i trend ostatniego meczu.",
+    "selected": "wybranych",
+    "Pick matches to compare": "Wybierz mecze do porównania",
+    "Choose at least one match above.": "Wybierz powyżej co najmniej jeden mecz.",
+    "Team match by match": "Drużyna mecz po meczu",
+    "Total = computed from all actions of the chosen matches. Trend = latest match against the average of the others.": "Suma = liczona ze wszystkich akcji wybranych meczów. Trend = ostatni mecz względem średniej z pozostałych.",
+    "Latest match against the average of the others": "Ostatni mecz względem średniej z pozostałych",
+    "Trend": "Trend",
+    "Players match by match": "Zawodnicy mecz po meczu",
+    "Usefulness per set in each match, and the totals over the chosen matches.": "Użyteczność na set w każdym meczu i suma z wybranych meczów.",
+    "Value per set": "Wartość na set",
+    "match": "mecz",
+    "Compare matches": "Porównaj mecze",
+    "Metric": "Wskaźnik"
 }

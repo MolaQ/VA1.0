@@ -12,6 +12,7 @@ use App\Livewire\Club\Members;
 use App\Livewire\Club\Settings;
 use App\Livewire\Club\Teams;
 use App\Livewire\Dashboard;
+use App\Livewire\Games\GameCompare;
 use App\Livewire\Games\GameForm;
 use App\Livewire\Games\GameIndex;
 use App\Livewire\Games\GameReport;
@@ -43,6 +44,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/games', GameIndex::class)->name('games.index');
         Route::get('/games/create', GameForm::class)->name('games.create');
+        Route::get('/games/compare', GameCompare::class)->name('games.compare');
         Route::get('/games/{game}', GameShow::class)->name('games.show');
         Route::get('/games/{game}/edit', GameForm::class)->name('games.edit');
         Route::get('/games/{game}/report', GameReport::class)->name('games.report');

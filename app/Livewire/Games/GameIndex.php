@@ -55,6 +55,7 @@ class GameIndex extends Component
             'games' => $query->paginate(12),
             'teams' => $club->teams()->orderBy('name')->get(),
             'canCreate' => $user->can('create', [Game::class, $club]),
+            'canCompare' => $user->is_super_admin || $user->hasRole($club, Role::Admin, Role::Trainer, Role::Player),
         ]);
     }
 }
