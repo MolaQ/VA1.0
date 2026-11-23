@@ -37,12 +37,34 @@ it('lets the AI pipeline push actions idempotently and broadcasts them', functio
     Event::assertDispatched(GameActionsRecorded::class, 2);
 });
 
-it('reports unknown jersey numbers as skipped', function () {
+it('adds unknown jersey numbers to the match team as #number', function () {
     ['club' => $club, 'game' => $game] = clubWithGame();
     Sanctum::actingAs(member($club, Role::Trainer), ['analysis:write']);
 
     $this->postJson("/api/v1/games/{$game->id}/actions", ['actions' => [
-        ['player_number' => 99, 'skill' => 'attack', 'grade' => '#'],
+        ['player_number' => 47, 'skill' => 'attack', 'grade' => '#'],
+        ['player_number' => 47, 'skill' => 'serve', 'grade' => '='],
+    ]])->assertCreated()->assertJson(['created' => 2, 'skipped' => []]);
+
+    $player = $club->players()->where('number', 47)->sole();
+
+    expect($player->team_id)->toBe($game->team_id)
+        ->and($player->full_name)->toBe('#47')
+        ->and($player->actions()->count())->toBe(2);
+
+    $player->update(['nickname' => 'Kangur']);
+    expect($player->fresh()->full_name)->toBe('Kangur');
+
+    $player->update(['first_name' => 'Jan', 'last_name' => 'Nowak']);
+    expect($player->fresh()->full_name)->toBe('Jan Nowak');
+});
+
+it('reports unknown player ids as skipped', function () {
+    ['club' => $club, 'game' => $game] = clubWithGame();
+    Sanctum::actingAs(member($club, Role::Trainer), ['analysis:write']);
+
+    $this->postJson("/api/v1/games/{$game->id}/actions", ['actions' => [
+        ['player_id' => 999999, 'skill' => 'attack', 'grade' => '#'],
     ]])->assertOk()->assertJsonPath('skipped.0.index', 0);
 });
 

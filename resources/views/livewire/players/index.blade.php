@@ -38,8 +38,10 @@
     @if ($isStaff)
         <x-ui.modal name="player-form" :title="$editingId ? __('Edit player') : __('New player')">
             <form wire:submit="save" class="grid gap-4 sm:grid-cols-2">
-                <x-ui.field label="{{ __('First name') }}" for="first_name" error="first_name"><input id="first_name" wire:model="first_name" class="input" required></x-ui.field>
-                <x-ui.field label="{{ __('Last name') }}" for="last_name" error="last_name"><input id="last_name" wire:model="last_name" class="input" required></x-ui.field>
+                <p class="text-sm text-muted sm:col-span-2">{{ __('A jersey number is enough. Without a name the player is shown as #47; add a name or a nickname whenever you like.') }}</p>
+                <x-ui.field label="{{ __('First name') }}" for="first_name" error="first_name"><input id="first_name" wire:model="first_name" class="input"></x-ui.field>
+                <x-ui.field label="{{ __('Last name') }}" for="last_name" error="last_name"><input id="last_name" wire:model="last_name" class="input"></x-ui.field>
+                <x-ui.field label="{{ __('Nickname') }}" for="nickname" error="nickname"><input id="nickname" wire:model="nickname" class="input" placeholder="{{ __('optional') }}"></x-ui.field>
                 <x-ui.field label="{{ __('Number') }}" for="number" error="number"><input id="number" type="number" min="0" max="99" wire:model="number" class="input"></x-ui.field>
                 <x-ui.field label="{{ __('Position') }}" for="position" error="position">
                     <select id="position" wire:model="position" class="input">

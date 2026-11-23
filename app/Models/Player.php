@@ -18,17 +18,19 @@ use Illuminate\Support\Str;
  * @property int $id
  * @property int|null $team_id
  * @property int|null $user_id
- * @property string $first_name
- * @property string $last_name
+ * @property string|null $first_name
+ * @property string|null $last_name
+ * @property string|null $nickname
  * @property int|null $number
  * @property Position|null $position
  * @property Carbon|null $birth_date
  * @property bool $is_active
- * @property-read string $full_name
+ * @property-read string $full_name Name, else nickname, else "#47".
+ * @property-read string $short_name Nickname, else last name, else "#47".
  * @property-read Team|null $team
  * @property-read User|null $user
  */
-#[Fillable(['club_id', 'team_id', 'user_id', 'first_name', 'last_name', 'number', 'position', 'birth_date', 'is_active'])]
+#[Fillable(['club_id', 'team_id', 'user_id', 'first_name', 'last_name', 'nickname', 'number', 'position', 'birth_date', 'is_active'])]
 class Player extends Model
 {
     use BelongsToClub;
@@ -45,14 +47,47 @@ class Player extends Model
         ];
     }
 
+    /**
+     * Display name: real name when known, otherwise the nickname, otherwise the jersey number.
+     */
     public function getFullNameAttribute(): string
     {
-        return trim($this->first_name.' '.$this->last_name);
+        $name = trim($this->first_name.' '.$this->last_name);
+
+        return $name !== '' ? $name : ($this->nickname ?: $this->numberLabel());
+    }
+
+    /**
+     * Compact label for timelines and clips.
+     */
+    public function getShortNameAttribute(): string
+    {
+        return $this->nickname ?: ($this->last_name ?: ($this->first_name ?: $this->numberLabel()));
+    }
+
+    public function numberLabel(): string
+    {
+        return $this->number !== null ? '#'.$this->number : '—';
+    }
+
+    /**
+     * True when the player is known only by the jersey number.
+     */
+    public function isAnonymous(): bool
+    {
+        return blank($this->first_name) && blank($this->last_name) && blank($this->nickname);
     }
 
     public function initials(): string
     {
-        return Str::upper(Str::substr($this->first_name, 0, 1).Str::substr($this->last_name, 0, 1));
+        if ($this->isAnonymous()) {
+            return (string) ($this->number ?? '?');
+        }
+
+        $source = trim($this->first_name.' '.$this->last_name) ?: (string) $this->nickname;
+        $parts = preg_split('/\s+/', $source) ?: [];
+
+        return Str::upper(Str::substr($parts[0] ?? '', 0, 1).Str::substr($parts[1] ?? '', 0, 1));
     }
 
     public function isLibero(): bool

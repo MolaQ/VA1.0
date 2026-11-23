@@ -41,6 +41,16 @@ class ActionIngestor
             foreach (array_values($items) as $index => $item) {
                 $player = $this->resolvePlayer($roster, $item, $game->team_id);
 
+                if ($player === false && Arr::get($item, 'player_id') === null) {
+                    // A jersey number we don't know yet: add it to the team as "#47", name it later.
+                    $player = Player::create([
+                        'club_id' => $game->club_id,
+                        'team_id' => $game->team_id,
+                        'number' => (int) $item['player_number'],
+                    ]);
+                    $roster->push($player);
+                }
+
                 if ($player === false) {
                     $skipped[] = ['index' => $index, 'message' => 'Player with the given id/number not found in the roster.'];
 

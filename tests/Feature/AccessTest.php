@@ -6,6 +6,7 @@ use App\Events\GameActionsRecorded;
 use App\Events\GameAnalysisUpdated;
 use App\Livewire\Games\GameForm;
 use App\Livewire\Games\GameShow;
+use App\Livewire\Players\PlayerIndex;
 use App\Models\Club;
 use App\Models\Game;
 use App\Models\GameAction;
@@ -121,4 +122,29 @@ it('does not let a trainer delete a match', function () {
         ->assertForbidden();
 
     expect(Game::find($game->id))->not->toBeNull();
+});
+
+it('lets staff add a player by jersey number only', function () {
+    ['club' => $club] = clubWithGame();
+
+    Livewire::actingAs(member($club, Role::Trainer))->test(PlayerIndex::class)
+        ->set('number', 47)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($club->players()->where('number', 47)->sole()->full_name)->toBe('#47');
+
+    Livewire::actingAs(member($club, Role::Trainer))->test(PlayerIndex::class)
+        ->call('save')
+        ->assertHasErrors('number');
+});
+
+it('adds a new jersey number while coding a match', function () {
+    ['club' => $club, 'game' => $game] = clubWithGame();
+
+    $id = Livewire::actingAs(member($club, Role::Trainer))->test(GameShow::class, ['game' => $game])
+        ->call('addNumber', 47)
+        ->effects['returns'][0] ?? null;
+
+    expect($id)->toBe($club->players()->where('number', 47)->sole()->id);
 });

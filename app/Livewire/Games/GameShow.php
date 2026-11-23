@@ -85,7 +85,7 @@ class GameShow extends Component
         }
 
         $query = $this->game->actions()
-            ->with(['player:id,number,first_name,last_name', 'set:id,number'])
+            ->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
             ->whereNotNull('video_time')
             ->when($playerId, fn ($q) => $q->where('player_id', $playerId), fn ($q) => $q->whereNotNull('player_id'))
             ->when($this->setNumber, fn ($q) => $q->whereHas('set', fn ($s) => $s->where('number', $this->setNumber)));
@@ -110,8 +110,30 @@ class GameShow extends Component
         return $query->orderBy('video_time')->limit(200)->get()
             ->map(fn (GameAction $a) => [
                 't' => (float) $a->video_time,
-                'label' => trim(($a->player ? '#'.$a->player->number.' '.$a->player->last_name : '').' · '.$a->skill->label().' '.$a->grade->value.($a->set ? ' · S'.$a->set->number : '')),
+                'label' => trim(($a->player ? trim($a->player->numberLabel().' '.($a->player->isAnonymous() ? '' : $a->player->short_name)) : '').' · '.$a->skill->label().' '.$a->grade->value.($a->set ? ' · S'.$a->set->number : '')),
             ])->all();
+    }
+
+    /**
+     * Coding a jersey number that isn't in the roster yet: add it to the match team as "#47".
+     */
+    public function addNumber(int $number): ?int
+    {
+        Gate::authorize('code', $this->game);
+
+        if ($number < 0 || $number > 99) {
+            return null;
+        }
+
+        $player = Player::query()->forClub($this->game->club_id)
+            ->where('team_id', $this->game->team_id)->where('number', $number)->first()
+            ?? Player::create(['club_id' => $this->game->club_id, 'team_id' => $this->game->team_id, 'number' => $number]);
+
+        if (! $player->is_active) {
+            $player->update(['is_active' => true]);
+        }
+
+        return $player->id;
     }
 
     /**
@@ -198,7 +220,7 @@ class GameShow extends Component
                 ? Player::query()->forClub($game->club_id)->where('team_id', $game->team_id)->where('is_active', true)->orderBy('number')->get()
                 : collect(),
             'timeline' => $game->actions()
-                ->with(['player:id,number,first_name,last_name', 'set:id,number'])
+                ->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
                 ->when($visible !== null, fn ($q) => $q->whereIn('player_id', $visible))
                 ->latest('id')->limit(40)->get(),
             'skills' => [Skill::Serve, Skill::Reception, Skill::Attack, Skill::Block, Skill::Dig, Skill::Set],

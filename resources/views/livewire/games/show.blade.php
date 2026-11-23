@@ -83,7 +83,7 @@
         <div class="space-y-6 xl:col-span-4">
             @if ($canCode)
                 <x-ui.card title="{{ __('Manual coding') }}" subtitle="{{ __('Correct or complete the AI analysis. Time is taken from the player.') }}" padding="p-4">
-                    <div x-data="{ player: null, skill: null }" class="space-y-4">
+                    <div x-data="{ player: null, skill: null, newNumber: '' }" class="space-y-4">
                         <div class="flex items-center gap-2 text-sm">
                             <label class="text-muted">Set</label>
                             <select wire:model.live="codingSet" class="input !w-auto !py-1.5">
@@ -101,6 +101,10 @@
                                             class="rounded-xl py-2 font-display text-lg font-bold transition active:scale-95">{{ $p->number ?? '–' }}</button>
                                 @endforeach
                             </div>
+                            <form class="mt-2 flex gap-1.5" x-on:submit.prevent="if (newNumber !== '') { $wire.addNumber(parseInt(newNumber)).then(id => { if (id) player = id; newNumber = '' }) }">
+                                <input type="number" min="0" max="99" x-model="newNumber" class="input !py-1.5 text-sm" placeholder="{{ __('Another number, e.g. 47') }}" aria-label="{{ __('Another number, e.g. 47') }}">
+                                <x-ui.button type="submit" size="sm" variant="secondary" icon="plus">{{ __('Add') }}</x-ui.button>
+                            </form>
                         </div>
                         <div>
                             <p class="label">{{ __('2. Skill') }}</p>
@@ -133,7 +137,7 @@
                             <button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-left" @if ($a->video_time !== null) x-on:click="seek({{ $a->video_time }} - 2)" @endif>
                                 <span class="w-12 shrink-0 text-xs tabular text-muted">{{ \App\Support\YouTube::formatTime($a->video_time) }}</span>
                                 <span class="grid size-7 shrink-0 place-items-center rounded-lg text-sm font-bold {{ $gradeStyles[$a->grade->value] }}">{{ $a->grade->value }}</span>
-                                <span class="min-w-0 truncate text-sm"><b>#{{ $a->player?->number ?? '?' }}</b> {{ $a->player?->last_name }} · {{ $a->skill->label() }}</span>
+                                <span class="min-w-0 truncate text-sm"><b>#{{ $a->player?->number ?? '?' }}</b> {{ $a->player && ! $a->player->isAnonymous() ? $a->player->short_name : '' }} · {{ $a->skill->label() }}</span>
                             </button>
                             @if ($a->source === \App\Enums\ActionSource::Ai)
                                 <x-ui.badge tone="accent" title="{{ __('Confidence') }} {{ $a->confidence !== null ? round($a->confidence * 100).'%' : '–' }}">AI</x-ui.badge>

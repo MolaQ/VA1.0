@@ -23,6 +23,8 @@ class PlayerIndex extends Component
 
     public string $last_name = '';
 
+    public string $nickname = '';
+
     public ?int $number = null;
 
     public ?string $position = null;
@@ -50,8 +52,9 @@ class PlayerIndex extends Component
 
         $this->resetValidation();
         $this->editingId = $player->id;
-        $this->first_name = $player->first_name;
-        $this->last_name = $player->last_name;
+        $this->first_name = (string) $player->first_name;
+        $this->last_name = (string) $player->last_name;
+        $this->nickname = (string) $player->nickname;
         $this->number = $player->number;
         $this->position = $player->position?->value;
         $this->team_id = $player->team_id;
@@ -65,14 +68,19 @@ class PlayerIndex extends Component
         $club = $this->club();
 
         $data = $this->validate([
-            'first_name' => ['required', 'string', 'max:80'],
-            'last_name' => ['required', 'string', 'max:80'],
-            'number' => ['nullable', 'integer', 'between:0,99'],
+            'first_name' => ['nullable', 'string', 'max:80'],
+            'last_name' => ['nullable', 'string', 'max:80'],
+            'nickname' => ['nullable', 'string', 'max:40'],
+            'number' => ['nullable', 'required_without_all:first_name,last_name,nickname', 'integer', 'between:0,99'],
             'position' => ['nullable', Rule::enum(Position::class)],
             'team_id' => ['nullable', Rule::exists('teams', 'id')->where('club_id', $club->id)],
             'birth_date' => ['nullable', 'date'],
             'is_active' => ['boolean'],
         ]);
+
+        foreach (['first_name', 'last_name', 'nickname'] as $field) {
+            $data[$field] = filled($data[$field]) ? trim((string) $data[$field]) : null;
+        }
 
         if ($this->editingId) {
             $player = $club->players()->findOrFail($this->editingId);
@@ -90,7 +98,7 @@ class PlayerIndex extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['editingId', 'first_name', 'last_name', 'number', 'position', 'team_id', 'birth_date']);
+        $this->reset(['editingId', 'first_name', 'last_name', 'nickname', 'number', 'position', 'team_id', 'birth_date']);
         $this->is_active = true;
         $this->resetValidation();
     }
@@ -105,6 +113,7 @@ class PlayerIndex extends Component
             ->when($this->search !== '', fn ($q) => $q->where(fn ($w) => $w
                 ->where('first_name', 'like', "%{$this->search}%")
                 ->orWhere('last_name', 'like', "%{$this->search}%")
+                ->orWhere('nickname', 'like', "%{$this->search}%")
                 ->orWhere('number', $this->search)))
             ->orderByRaw('number is null, number')->orderBy('last_name');
 
