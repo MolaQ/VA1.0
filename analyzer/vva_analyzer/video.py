@@ -23,6 +23,22 @@ def ffmpeg_exe() -> str:
         ) from e
 
 
+_last_shown = [-1]
+
+
+def _print_progress(d: dict) -> None:
+    if d.get("status") == "downloading":
+        total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+        if total:
+            pct = int(100 * d.get("downloaded_bytes", 0) / total)
+            if pct // 5 != _last_shown[0]:
+                _last_shown[0] = pct // 5
+                print(f"  pobieranie / download: {pct}% z {total / 1e9:.1f} GB", flush=True)
+    elif d.get("status") == "finished":
+        _last_shown[0] = -1
+        print("  pobrane / downloaded", flush=True)
+
+
 def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
     """Download a YouTube video (only recordings you own or may analyse) as mp4."""
     from yt_dlp import YoutubeDL
@@ -34,6 +50,7 @@ def download(url: str, workdir: Path, max_height: int = 1080) -> Path:
         "outtmpl": str(workdir / "%(id)s.%(ext)s"),
         "quiet": True,
         "noprogress": True,
+        "progress_hooks": [_print_progress],
         "ffmpeg_location": ffmpeg_exe(),
     }
     with YoutubeDL(opts) as ydl:
