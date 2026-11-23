@@ -83,13 +83,11 @@ class DemoSeeder extends Seeder
         Event::fake([GameActionsRecorded::class, GameAnalysisUpdated::class]); // no broadcasting while seeding
 
         $this->scoutedGame($ingestor, $team, $players->all(), 'AZS Politechnika', now()->subDays(3), 'https://www.youtube.com/watch?v=XCXJATWV9O4', [[25, 21], [25, 23], [22, 25], [25, 19]]);
-        $this->scoutedGame($ingestor, $team, $players->all(), 'MKS Będzin II', now()->subDays(10), 'https://youtu.be/ScMzIvxBSi4', [[20, 25], [25, 22], [25, 27], [18, 25]]);
+        $this->scoutedGame($ingestor, $team, $players->all(), 'MKS Będzin II', now()->subDays(10), null, [[20, 25], [25, 22], [25, 27], [18, 25]]);
 
         $club->games()->create([
             'team_id' => $team->id, 'opponent' => 'Wisła Kraków', 'played_at' => now()->subDay(), 'is_home' => true,
-            'youtube_url' => 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
-            'analysis_status' => AnalysisStatus::Processing, 'analysis_progress' => 42,
-            'analysis_message' => 'Rozpoznawanie akcji w secie 2…',
+            'analysis_status' => AnalysisStatus::Pending,
         ]);
     }
 
@@ -102,7 +100,7 @@ class DemoSeeder extends Seeder
      * @param  array<int, Player>  $players
      * @param  array<int, array{0: int, 1: int}>  $scores
      */
-    private function scoutedGame(ActionIngestor $ingestor, Team $team, array $players, string $opponent, mixed $date, string $url, array $scores): Game
+    private function scoutedGame(ActionIngestor $ingestor, Team $team, array $players, string $opponent, mixed $date, ?string $url, array $scores): Game
     {
         $game = $team->games()->create([
             'club_id' => $team->club_id, 'opponent' => $opponent, 'played_at' => $date, 'is_home' => true,

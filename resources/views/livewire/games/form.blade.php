@@ -45,9 +45,22 @@
             </label>
         </x-ui.card>
 
-        <div class="flex justify-end gap-2 lg:col-span-5">
+        <div class="flex flex-wrap justify-end gap-2 lg:col-span-5">
+            @if ($canDelete)
+                <x-ui.button variant="danger" icon="trash" class="mr-auto" x-on:click="$dispatch('open-modal', 'delete-game')">{{ __('Delete match') }}</x-ui.button>
+            @endif
             <x-ui.button variant="ghost" :href="$game ? route('games.show', $game) : route('games.index')">{{ __('Cancel') }}</x-ui.button>
             <x-ui.button type="submit" icon="check" wire:loading.attr="disabled">{{ __('Save match') }}</x-ui.button>
         </div>
     </form>
+
+    @if ($canDelete)
+        <x-ui.modal name="delete-game" title="{{ __('Delete match') }}">
+            <p class="text-sm text-muted">{{ __('The match, its sets and all recorded actions will be permanently deleted. This cannot be undone.') }}</p>
+            <div class="mt-6 flex justify-end gap-2">
+                <x-ui.button variant="ghost" x-on:click="$dispatch('close-modal', 'delete-game')">{{ __('Cancel') }}</x-ui.button>
+                <x-ui.button variant="danger" icon="trash" wire:click="delete" wire:loading.attr="disabled">{{ __('Delete permanently') }}</x-ui.button>
+            </div>
+        </x-ui.modal>
+    @endif
 </div>

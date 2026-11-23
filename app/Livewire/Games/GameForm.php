@@ -117,10 +117,22 @@ class GameForm extends Component
         $this->redirectRoute('games.show', $game, navigate: true);
     }
 
+    public function delete(): void
+    {
+        abort_unless($this->game !== null, 404);
+        Gate::authorize('delete', $this->game);
+
+        $this->game->delete();
+
+        session()->flash('toast', __('Match deleted.'));
+        $this->redirectRoute('games.index', navigate: true);
+    }
+
     public function render(): View
     {
         return view('livewire.games.form', [
             'teams' => $this->club()->teams()->orderBy('name')->get(),
+            'canDelete' => $this->game !== null && Gate::allows('delete', $this->game),
         ])->title($this->game ? __('Edit match') : __('New match'));
     }
 }

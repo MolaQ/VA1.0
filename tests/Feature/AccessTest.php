@@ -1,11 +1,16 @@
 <?php
 
+use App\Enums\ActionSource;
 use App\Enums\Role;
 use App\Events\GameActionsRecorded;
 use App\Events\GameAnalysisUpdated;
+use App\Livewire\Games\GameForm;
 use App\Livewire\Games\GameShow;
 use App\Models\Club;
+use App\Models\Game;
+use App\Models\GameAction;
 use App\Models\User;
+use App\Services\ActionIngestor;
 use App\Support\Visibility;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
@@ -86,4 +91,34 @@ it('returns video clips behind a stat cell', function () {
     expect($component->instance()->clips($players[0]->id, 'attack', '#'))->toHaveCount(1)
         ->and($component->instance()->clips($players[0]->id, 'attack'))->toHaveCount(2)
         ->and($component->instance()->clips($players[0]->id, 'points')[0]['t'])->toBe(300.0);
+});
+
+it('lets a club admin delete a match with its actions', function () {
+    ['club' => $club, 'game' => $game, 'players' => $players] = clubWithGame();
+    $admin = member($club, Role::Admin);
+    $game->sets()->create(['number' => 1, 'score_us' => 25, 'score_them' => 20]);
+    app(ActionIngestor::class)->ingest($game, [
+        ['set' => 1, 'rally' => 1, 'player_number' => 2, 'skill' => 'attack', 'grade' => '#', 'video_time' => 15],
+    ], ActionSource::Ai);
+    expect(GameAction::where('game_id', $game->id)->count())->toBe(1);
+
+    Livewire::actingAs($admin)->test(GameForm::class, ['game' => $game])
+        ->assertSee(__('Delete match'))
+        ->call('delete')
+        ->assertRedirect(route('games.index'));
+
+    expect(Game::find($game->id))->toBeNull()
+        ->and(GameAction::where('game_id', $game->id)->count())->toBe(0);
+});
+
+it('does not let a trainer delete a match', function () {
+    ['club' => $club, 'game' => $game, 'players' => $players] = clubWithGame();
+    $trainer = member($club, Role::Trainer);
+
+    Livewire::actingAs($trainer)->test(GameForm::class, ['game' => $game])
+        ->assertDontSee(__('Delete match'))
+        ->call('delete')
+        ->assertForbidden();
+
+    expect(Game::find($game->id))->not->toBeNull();
 });
