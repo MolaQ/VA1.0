@@ -88,6 +88,13 @@ try {
 
     $venv = Join-Path $AppDir 'venv'
     $vpy = Join-Path $venv 'Scripts\python.exe'
+    if (Test-Path $vpy) {
+        & $vpy -c "import sys, pip" 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host 'Środowisko z poprzedniej instalacji jest uszkodzone: tworzę je od nowa.' -ForegroundColor Yellow
+            Remove-Item -Recurse -Force $venv -ErrorAction SilentlyContinue
+        }
+    }
     if (-not (Test-Path $vpy)) {
         Step 'Tworzę środowisko programu'
         & $py -m venv $venv
