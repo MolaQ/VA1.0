@@ -4,6 +4,7 @@
     @include('partials.head', ['title' => __('Volleyball analysis from video')])
 </head>
 <body class="min-h-dvh overflow-x-hidden">
+    @isset($pageViewId)<div id="vva-view" data-id="{{ $pageViewId }}" hidden></div>@endisset
     <header class="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-8">
         <x-logo />
         <nav class="flex items-center gap-2">

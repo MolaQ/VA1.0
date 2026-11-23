@@ -4,7 +4,9 @@
  * `echo-private:*` events, so match stats refresh live while the AI works.
  */
 import './echo';
+import './analytics';
 import './pwa';
+import './realtime';
 import ytPlayer from './youtube-player';
 
 document.addEventListener('alpine:init', () => {

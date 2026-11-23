@@ -3,6 +3,7 @@
 namespace App\Livewire\Club;
 
 use App\Enums\Role;
+use App\Events\ClubActivity;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Membership;
 use App\Models\Player;
@@ -69,6 +70,10 @@ class Members extends Component
 
             $role = Role::from($data['role']);
             $club->addMember($user, $role);
+            ClubActivity::dispatch($club->id, ClubActivity::MEMBER_ADDED, [
+                'user' => $user->name,
+                'role' => $role->value,
+            ], $this->user()->id, null, 'staff');
 
             $ids = array_map('intval', $data['player_ids']);
 

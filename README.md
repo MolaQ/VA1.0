@@ -31,6 +31,8 @@ Drugi klub (`trener@sokol.test`) pokazuje izolację danych między klubami.
 | Na żywo | kanały prywatne `games.{id}` i `clubs.{id}` (`routes/channels.php`), Livewire `echo-private:` listeners |
 | Analiza AI | `RequestVideoAnalysis` wysyła mecz do `VVA_ANALYZER_URL`; analizator odsyła wyniki przez API |
 | i18n | `lang/pl.json`, `lang/it.json` (klucze po angielsku), `lang/{pl,it}/validation.php`; `SetLocale`: profil → sesja → przeglądarka → `pl` |
+| Analityka bez cookies | middleware `TrackPageView` + `App\Analytics\*`: odwiedzający = `sha256(dzienna sól + IP + UA)`, bez zapisu IP/UA, filtr botów, respektuje DNT/GPC, czas zaangażowania przez `sendBeacon` (`POST /a/e`), retencja `ANALYTICS_RETENTION_DAYS` (`model:prune`). Panel: **Klub → Analityka** |
+| Online i toasty | kanał presence `online.clubs.{id}` (lista osób online w nagłówku), zdarzenie `ClubActivity` na `clubs.{id}` → toasty tłumaczone w przeglądarce (nowy mecz, koniec analizy AI, nowy członek, logowanie – dla sztabu) |
 | PWA | `public/manifest.webmanifest`, `public/sw.js`, `public/offline.html`, ikony w `public/icons`; logowanie z „zapamiętaj mnie” domyślnie |
 
 ## API dla modułu AI (`/api/v1`, `Authorization: Bearer <token>`)

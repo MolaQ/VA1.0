@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\AnalysisStatus;
+use App\Events\ClubActivity;
 use App\Events\GameAnalysisUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\UpdateAnalysisRequest;
@@ -17,6 +18,7 @@ class AnalysisController extends Controller
     public function update(UpdateAnalysisRequest $request, Game $game): JsonResponse
     {
         $status = AnalysisStatus::from($request->validated('status'));
+        $wasCompleted = $game->analysis_status === AnalysisStatus::Completed;
 
         $game->forceFill([
             'analysis_status' => $status,
@@ -26,6 +28,12 @@ class AnalysisController extends Controller
         ])->save();
 
         GameAnalysisUpdated::dispatch($game);
+
+        if ($status === AnalysisStatus::Completed && ! $wasCompleted) {
+            ClubActivity::dispatch($game->club_id, ClubActivity::ANALYSIS_COMPLETED, [
+                'opponent' => $game->opponent,
+            ], null, route('games.show', $game));
+        }
 
         return response()->json([
             'status' => $game->analysis_status->value,

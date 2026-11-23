@@ -13,7 +13,7 @@
    {{ $attributes->merge(['class' => 'card group block overflow-hidden transition duration-300 hover:-translate-y-1 hover:border-line-strong hover:shadow-xl hover:shadow-brand-500/10 animate-fade-up']) }}>
     <div class="relative aspect-video overflow-hidden bg-surface-3">
         @if ($game->youtube_id)
-            <img src="{{ \App\Support\YouTube::thumbnail($game->youtube_id) }}" alt="" loading="lazy"
+            <img src="{{ \App\Support\YouTube::thumbnail($game->youtube_id) }}" alt="" loading="lazy" onerror="this.remove()"
                  class="size-full object-cover opacity-80 transition duration-500 group-hover:scale-105 group-hover:opacity-100">
         @else
             <div class="grid size-full place-items-center text-subtle"><x-icon name="video" class="size-10" /></div>

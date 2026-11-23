@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AnalyticsBeaconController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PreferencesController;
+use App\Livewire\Analytics;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\Register;
 use App\Livewire\Club\Integrations;
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 Route::get('/locale/{locale}', LocaleController::class)->name('locale.switch');
+Route::post('/a/e', AnalyticsBeaconController::class)->middleware('throttle:120,1')->name('analytics.beacon');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', Login::class)->name('login');
@@ -52,6 +55,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/settings', Settings::class)->name('settings');
         });
 
+        Route::get('/analytics', Analytics::class)->name('analytics');
         Route::get('/platform/clubs', Clubs::class)->name('platform.clubs');
     });
 });

@@ -3,6 +3,7 @@
 namespace App\Livewire\Games;
 
 use App\Enums\AnalysisStatus;
+use App\Events\ClubActivity;
 use App\Jobs\RequestVideoAnalysis;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
@@ -102,6 +103,10 @@ class GameForm extends Component
         } else {
             $videoChanged = true;
             $game = $club->games()->create($attributes + ['analysis_status' => AnalysisStatus::Pending]);
+            ClubActivity::dispatch($club->id, ClubActivity::GAME_CREATED, [
+                'user' => $this->user()->name,
+                'opponent' => $game->opponent,
+            ], $this->user()->id, route('games.show', $game));
         }
 
         if ($data['analyze'] && $videoChanged && $game->youtube_id) {

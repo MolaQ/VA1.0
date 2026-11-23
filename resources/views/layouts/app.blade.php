@@ -15,6 +15,7 @@
     $adminNav = $isAdmin ? [
         ['route' => 'club.members', 'match' => 'club.members', 'icon' => 'shield', 'label' => __('Members & roles')],
         ['route' => 'club.teams', 'match' => 'club.teams', 'icon' => 'volleyball', 'label' => __('Teams')],
+        ['route' => 'analytics', 'match' => 'analytics', 'icon' => 'chart', 'label' => __('Analytics')],
         ['route' => 'club.integrations', 'match' => 'club.integrations', 'icon' => 'key', 'label' => __('AI integrations')],
         ['route' => 'club.settings', 'match' => 'club.settings', 'icon' => 'settings', 'label' => __('Club settings')],
     ] : [];
@@ -29,6 +30,7 @@
     @include('partials.head')
 </head>
 <body class="min-h-dvh" x-data="{ drawer: false }">
+    @isset($pageViewId)<div id="vva-view" data-id="{{ $pageViewId }}" hidden></div>@endisset
     {{-- Desktop sidebar --}}
     <aside class="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-line bg-bg-elevated/80 backdrop-blur-xl lg:flex">
         <div class="flex h-16 items-center px-5">
@@ -67,6 +69,9 @@
                         <span class="grid size-7 place-items-center rounded-lg bg-surface-3 text-[11px] font-bold">{{ $club->initials() }}</span>
                         {{ $club->name }}
                     </span>
+                @endif
+                @if ($club)
+                    @include('partials.online-users')
                 @endif
                 @include('partials.locale-switcher')
                 @include('partials.theme-toggle')
@@ -113,6 +118,20 @@
     </nav>
 
     <x-toast />
+    <script>
+        window.VVA = {
+            userId: @js($user?->id),
+            clubId: @js($club?->id),
+            isStaff: @js((bool) $isStaff),
+            roles: @js(collect(\App\Enums\Role::cases())->mapWithKeys(fn ($r) => [$r->value => $r->label()])),
+            activity: @js([
+                'game_created' => __(':user added a match vs :opponent'),
+                'analysis_completed' => __('AI analysis finished: match vs :opponent'),
+                'member_added' => __(':user joined the club as :role'),
+                'user_signed_in' => __(':user signed in'),
+            ]),
+        };
+    </script>
     @livewireScripts
 </body>
 </html>
