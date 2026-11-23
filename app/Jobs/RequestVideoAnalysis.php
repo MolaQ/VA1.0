@@ -12,8 +12,12 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * Hands a match over to the external AI video-analysis service.
+ * Hands a match over to AI video analysis.
  *
+ * Default (no VVA_ANALYZER_URL): the match is queued and the club's analysis agent
+ * (a program on a computer with a GPU) takes it through POST /api/v1/agent/claim.
+ *
+ * Push mode (VVA_ANALYZER_URL set):
  * Contract sent to the analyzer (JSON POST to VVA_ANALYZER_URL):
  *   game_id, youtube_id, youtube_url, team, roster[{id, number, name, position}],
  *   api_base (where to push results: {api_base}/games/{id}/actions etc.)
@@ -40,7 +44,7 @@ class RequestVideoAnalysis implements ShouldQueue
         $url = config('services.analyzer.url');
 
         if (blank($url)) {
-            $this->update($game, AnalysisStatus::Manual, 0, __('The AI analyzer is not connected yet. You can code the match manually.'));
+            $this->update($game, AnalysisStatus::Queued, 0, __('Waiting for the club\'s analysis agent.'));
 
             return;
         }

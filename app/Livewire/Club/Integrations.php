@@ -3,8 +3,11 @@
 namespace App\Livewire\Club;
 
 use App\Livewire\Concerns\InteractsWithClub;
+use App\Models\Game;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -31,7 +34,7 @@ class Integrations extends Component
         $this->validate(['tokenName' => ['required', 'string', 'max:60']]);
 
         $this->plainToken = $this->user()
-            ->createToken($this->tokenName.' · '.$this->club()->name, ['analysis:write'])
+            ->createToken($this->tokenName.' · '.$this->club()->name, ['analysis:write', 'club:'.$this->club()->id])
             ->plainTextToken;
 
         $this->toast(__('Token created. Copy it now.'));
@@ -45,8 +48,17 @@ class Integrations extends Component
 
     public function render(): View
     {
+        $clubId = $this->club()->id;
+        // the agent asks for work every few seconds, so a recently used club token means it is running
+        $agentSeen = PersonalAccessToken::query()
+            ->where('abilities', 'like', '%"club:'.$clubId.'"%')
+            ->max('last_used_at');
+
         return view('livewire.club.integrations', [
             'tokens' => $this->user()->tokens()->latest()->get(),
+            'agentOnline' => $agentSeen !== null && Carbon::parse($agentSeen)->gt(now()->subMinutes(2)),
+            'agentSeen' => $agentSeen !== null ? Carbon::parse($agentSeen) : null,
+            'queued' => Game::query()->where('club_id', $clubId)->whereIn('analysis_status', ['queued', 'processing'])->count(),
             'apiBase' => url('/api/v1'),
             'analyzerConfigured' => filled(config('services.analyzer.url')),
         ]);

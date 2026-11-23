@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\ActionController;
+use App\Http\Controllers\Api\V1\AgentController;
 use App\Http\Controllers\Api\V1\AnalysisController;
 use App\Http\Controllers\Api\V1\GameController;
 use App\Http\Controllers\Api\V1\SetController;
@@ -18,6 +19,7 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->name('api.')-
         'clubs' => $request->user()->clubs()->get(['clubs.id', 'clubs.name']),
     ])->name('me');
 
+    Route::post('/agent/claim', [AgentController::class, 'claim'])->name('agent.claim');
     Route::get('/games/{game}', [GameController::class, 'show'])->name('games.show');
     Route::post('/games/{game}/actions', [ActionController::class, 'store'])->name('games.actions.store');
     Route::delete('/games/{game}/actions', [ActionController::class, 'destroy'])->name('games.actions.destroy');

@@ -5,6 +5,7 @@ use App\Enums\Grade;
 use App\Enums\Role;
 use App\Events\GameActionsRecorded;
 use App\Events\GameAnalysisUpdated;
+use App\Jobs\RequestVideoAnalysis;
 use App\Livewire\Games\GameShow;
 use App\Models\Club;
 use App\Models\SetLineup;
@@ -166,4 +167,37 @@ it('rejects a player in two rotation positions', function () {
         ->call('saveLineup', 1, ['1' => $players[0]->id, '2' => $players[0]->id]);
 
     expect(SetLineup::count())->toBe(0);
+});
+
+it('lets the club agent claim queued matches one at a time', function () {
+    ['club' => $club, 'game' => $game] = clubWithGame();
+    $other = clubWithGame();
+    $game->forceFill(['analysis_status' => AnalysisStatus::Queued, 'analysis_updated_at' => now()])->save();
+    $other['game']->forceFill(['analysis_status' => AnalysisStatus::Queued, 'analysis_updated_at' => now()])->save();
+
+    $admin = member($club, Role::Admin);
+    Sanctum::actingAs($admin, ['analysis:write', 'club:'.$club->id]);
+
+    $this->postJson('/api/v1/agent/claim')
+        ->assertOk()
+        ->assertJsonPath('data.id', $game->id)
+        ->assertJsonPath('data.youtube_id', 'dQw4w9WgXcQ');
+
+    expect($game->fresh()->analysis_status)->toBe(AnalysisStatus::Processing);
+
+    // nothing else for this club (the other club's match is not ours)
+    $this->postJson('/api/v1/agent/claim')->assertNoContent();
+
+    // an agent that died: the match goes back to the queue after a while
+    $game->forceFill(['analysis_updated_at' => now()->subHour()])->save();
+    $this->postJson('/api/v1/agent/claim')->assertOk()->assertJsonPath('data.id', $game->id);
+});
+
+it('queues matches for the agent when no analyzer url is configured', function () {
+    ['game' => $game] = clubWithGame();
+    config(['services.analyzer.url' => null]);
+
+    (new RequestVideoAnalysis($game))->handle();
+
+    expect($game->fresh()->analysis_status)->toBe(AnalysisStatus::Queued);
 });

@@ -5,9 +5,21 @@
         <div class="space-y-6 xl:col-span-2">
             <x-ui.card title="{{ __('Analyzer status') }}">
                 <div class="flex items-center gap-3">
-                    <span @class(['size-3 rounded-full', 'bg-success-500 animate-pulse-soft' => $analyzerConfigured, 'bg-warning-500' => ! $analyzerConfigured])></span>
-                    <p class="text-sm">{{ $analyzerConfigured ? __('AI analyzer connected (VVA_ANALYZER_URL).') : __('The AI analyzer is not configured yet: matches can be coded manually.') }}</p>
+                    @php $ok = $analyzerConfigured || $agentOnline; @endphp
+                    <span @class(['size-3 shrink-0 rounded-full', 'bg-success-500 animate-pulse-soft' => $ok, 'bg-warning-500' => ! $ok])></span>
+                    <p class="text-sm">
+                        @if ($agentOnline)
+                            {{ __('Analysis agent is running.') }}
+                        @elseif ($analyzerConfigured)
+                            {{ __('AI analyzer connected (VVA_ANALYZER_URL).') }}
+                        @elseif ($agentSeen)
+                            {{ __('Analysis agent offline, last seen :time.', ['time' => $agentSeen->diffForHumans()]) }}
+                        @else
+                            {{ __('No analysis agent yet: install VVA Analyzer on a computer with a graphics card and paste a token from here.') }}
+                        @endif
+                    </p>
                 </div>
+                <p class="mt-3 text-xs text-muted">{{ __('Matches waiting or in analysis: :count', ['count' => $queued]) }}</p>
             </x-ui.card>
 
             <x-ui.card title="{{ __('New API token') }}">
