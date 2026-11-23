@@ -27,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $zone_to
  * @property ActionSource $source
  * @property float|null $confidence
+ * @property bool $needs_review
+ * @property string|null $review_note
+ * @property \Illuminate\Support\Carbon|null $reviewed_at
  * @property string|null $external_id
  * @property array<string, mixed>|null $meta
  * @property int|null $created_by
@@ -36,7 +39,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'club_id', 'game_id', 'game_set_id', 'player_id', 'rally', 'skill', 'grade', 'video_time',
-    'zone_from', 'zone_to', 'source', 'confidence', 'external_id', 'meta', 'created_by',
+    'zone_from', 'zone_to', 'source', 'confidence', 'needs_review', 'review_note', 'reviewed_at',
+    'external_id', 'meta', 'created_by',
 ])]
 class GameAction extends Model
 {
@@ -53,6 +57,8 @@ class GameAction extends Model
             'source' => ActionSource::class,
             'video_time' => 'float',
             'confidence' => 'float',
+            'needs_review' => 'boolean',
+            'reviewed_at' => 'datetime',
             'meta' => 'array',
         ];
     }
@@ -79,6 +85,22 @@ class GameAction extends Model
     public function player(): BelongsTo
     {
         return $this->belongsTo(Player::class);
+    }
+
+    /** Below this AI confidence an action is left for the analyst to clarify. */
+    public const REVIEW_CONFIDENCE = 0.6;
+
+    /**
+     * Why the action is waiting for the analyst.
+     */
+    public function reviewReason(): string
+    {
+        return match (true) {
+            $this->review_note !== null && $this->review_note !== '' => $this->review_note,
+            $this->player_id === null => __('Player not recognised'),
+            $this->confidence !== null && $this->confidence < self::REVIEW_CONFIDENCE => __('Low AI confidence').' ('.round($this->confidence * 100).'%)',
+            default => __('Marked as unclear'),
+        };
     }
 
     /**

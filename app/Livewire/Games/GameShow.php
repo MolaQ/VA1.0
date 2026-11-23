@@ -5,6 +5,7 @@ namespace App\Livewire\Games;
 use App\Enums\ActionSource;
 use App\Enums\Grade;
 use App\Enums\Skill;
+use App\Events\GameActionsRecorded;
 use App\Jobs\RequestVideoAnalysis;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
@@ -77,7 +78,7 @@ class GameShow extends Component
      *
      * @return array<int, array{t: float, label: string}>
      */
-    public function clips(?int $playerId, string $skill, string $filter = 'all'): array
+    public function clips(?int $playerId, string $skill, string $filter = 'all', ?int $zone = null): array
     {
         $visible = Visibility::playerIdsFor($this->user(), $this->game);
 
@@ -88,7 +89,7 @@ class GameShow extends Component
         $query = $this->game->actions()
             ->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
             ->whereNotNull('video_time')
-            ->when($playerId, fn ($q) => $q->where('player_id', $playerId), fn ($q) => $q->whereNotNull('player_id'))
+            ->when($playerId, fn ($q) => $q->where('player_id', $playerId))
             ->when($this->setNumber, fn ($q) => $q->whereHas('set', fn ($s) => $s->where('number', $this->setNumber)));
 
         if ($skill === 'points') {
@@ -106,6 +107,11 @@ class GameShow extends Component
             };
 
             $query->when($grades, fn ($q) => $q->whereIn('grade', $grades));
+
+            // attack: where it was hit from; serve and the rest: where the ball went
+            if ($zone !== null && $zone >= 1 && $zone <= 9) {
+                $query->where($skill === Skill::Attack->value ? 'zone_from' : 'zone_to', $zone);
+            }
         }
 
         return $query->orderBy('video_time')->limit(200)->get()
@@ -141,7 +147,7 @@ class GameShow extends Component
      * Manual coding (fallback / correction of the AI): one tap (or keystroke) per touch.
      * Zones are optional: attack from / to, serve target.
      */
-    public function record(int $playerId, string $skill, string $grade, ?float $time, ?int $zoneFrom = null, ?int $zoneTo = null): void
+    public function record(int $playerId, string $skill, string $grade, ?float $time, ?int $zoneFrom = null, ?int $zoneTo = null, bool $unclear = false): void
     {
         Gate::authorize('code', $this->game);
 
@@ -156,6 +162,7 @@ class GameShow extends Component
             'video_time' => $time !== null ? round(max(0, $time), 2) : null,
             'zone_from' => $zone($zoneFrom),
             'zone_to' => $zone($zoneTo),
+            'needs_review' => $unclear,
         ]], ActionSource::Manual, $this->user());
 
         if ($result->skipped !== []) {
@@ -189,6 +196,42 @@ class GameShow extends Component
 
         $this->rally++;
         $this->dispatch('stats-refreshed');
+    }
+
+    /**
+     * The analyst clarifies an action: optionally sets who did it and the grade, then confirms it.
+     */
+    public function resolveAction(int $actionId, ?int $playerId = null, ?string $grade = null): void
+    {
+        Gate::authorize('code', $this->game);
+
+        $action = $this->game->actions()->findOrFail($actionId);
+
+        if ($playerId !== null) {
+            abort_unless(Player::query()->forClub($this->game->club_id)->whereKey($playerId)->exists(), 422);
+            $action->player_id = $playerId;
+        }
+
+        if ($grade !== null) {
+            $action->grade = Grade::from($grade);
+        }
+
+        $action->fill(['needs_review' => false, 'reviewed_at' => now()])->save();
+        GameActionsRecorded::dispatch($this->game, 0, 1, 0, [$action->toBroadcast()]);
+    }
+
+    /**
+     * Leave an action for later: "to clarify", with an optional note for the analyst.
+     */
+    public function flagAction(int $actionId, ?string $note = null): void
+    {
+        Gate::authorize('code', $this->game);
+
+        $note = $note !== null ? mb_substr(trim($note), 0, 255) : null;
+        $this->game->actions()->findOrFail($actionId)->update([
+            'needs_review' => true,
+            'review_note' => $note !== '' ? $note : null,
+        ]);
     }
 
     public function nextRally(): void
@@ -285,6 +328,11 @@ class GameShow extends Component
                 ->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
                 ->when($visible !== null, fn ($q) => $q->whereIn('player_id', $visible))
                 ->latest('id')->limit(40)->get(),
+            'review' => $canCode
+                ? $game->actions()->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
+                    ->where('needs_review', true)->orderBy('video_time')->orderBy('id')->limit(50)->get()
+                : collect(),
+            'reviewCount' => $canCode ? $game->actions()->where('needs_review', true)->count() : 0,
             'skills' => [Skill::Serve, Skill::Reception, Skill::Attack, Skill::Block, Skill::Dig, Skill::Set],
             'grades' => Grade::cases(),
         ])->title($game->title());

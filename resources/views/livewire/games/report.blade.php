@@ -24,6 +24,8 @@
     $rallyCount = $report->rallies->count();
     $known = $report->knownRallies();
     $zoneName = fn ($z) => $z === 'none' ? __('No zone') : __('Zone').' '.$z;
+    // opens the match page and plays those actions back to back
+    $clipUrl = fn (?int $player, string $skill, string $filter = 'all', $zone = null) => route('games.show', $game).'?clip='.($player ?? '').','.$skill.','.urlencode($filter).','.($zone ?? '').($report->setNumber ? '&set='.$report->setNumber : '');
 @endphp
 <div class="space-y-6">
     {{-- Header --}}
@@ -221,14 +223,14 @@
                         @forelse ($report->players->filter(fn ($p) => $p->touches() > 0) as $p)
                             <tr wire:key="pr-{{ $p->player?->id }}">
                                 <td class="!text-left font-display text-base font-bold text-muted">{{ $p->player?->number }}</td>
-                                <td class="!text-left font-semibold">{{ $p->player?->full_name }}</td>
+                                <td class="!text-left font-semibold"><x-jersey :player="$p->player" :name="false" /> {{ $p->player?->full_name }}</td>
                                 <td class="group-start text-muted">{{ $p->setsPlayed() }}</td>
                                 <td class="group-start font-semibold">{{ $p->points() }}</td>
                                 <td>{{ $p->pointsLost() }}</td>
                                 <td @class(['text-success-400' => $p->plusMinus() > 0, 'text-danger-400' => $p->plusMinus() < 0])>{{ $p->plusMinus() }}</td>
                                 @foreach ($cols as $s)
                                     @php $l = $p->skill($s); @endphp
-                                    <td class="group-start">{{ $l->total() ?: '' }}</td>
+                                    <td class="group-start">@if ($l->total())<a href="{{ $clipUrl($p->player?->id, $s->value) }}" class="stat-cell" title="{{ __('Watch on video') }}">{{ $l->total() }}</a>@endif</td>
                                     <td>@if ($l->total())<x-pct :value="$l->success()" :good="$good[$s->value][0]" />@endif</td>
                                     <td>@if ($l->total())<x-pct :value="$l->efficiency()" :good="$good[$s->value][1]" />@endif</td>
                                 @endforeach
@@ -303,7 +305,7 @@
                             @forelse ($attackers as $id)
                                 @php $pl = $report->player($id); @endphp
                                 <tr>
-                                    <td class="!text-left"><b>{{ $pl?->numberLabel() }}</b> {{ $pl && ! $pl->isAnonymous() ? $pl->short_name : '' }}</td>
+                                    <td class="!text-left"><x-jersey :player="$pl" /></td>
                                     @foreach ($buckets as $b)
                                         @php $n = $report->distributionByAttacker[$b][$id] ?? 0; $t = array_sum($report->distributionByAttacker[$b]); @endphp
                                         <td class="group-start">@if ($n)<span class="font-semibold">{{ round(100 * $n / max(1, $t)) }}%</span> <span class="text-[10px] text-muted">({{ $n }})</span>@else<span class="text-subtle">·</span>@endif</td>
@@ -332,7 +334,7 @@
                         <tbody>
                             @forelse ($report->setters as $row)
                                 <tr>
-                                    <td class="!text-left"><b>{{ $row['player']?->numberLabel() }}</b> {{ $row['player'] && ! $row['player']->isAnonymous() ? $row['player']->short_name : '' }}</td>
+                                    <td class="!text-left"><x-jersey :player="$row['player']" /></td>
                                     <td class="group-start font-semibold">{{ $row['set']->total() }}</td>
                                     <td>{{ $row['set']->count('#') }}</td>
                                     <td>{{ $row['set']->count('+') }}</td>
@@ -382,7 +384,7 @@
                                     @php $diff = $row['us'] - $row['them']; @endphp
                                     <tr>
                                         <td class="!text-left font-display text-base font-bold">{{ ['', 'I', 'II', 'III', 'IV', 'V', 'VI'][$r] }}</td>
-                                        <td class="!text-left">{{ $row['server']?->numberLabel() }} {{ $row['server'] && ! $row['server']->isAnonymous() ? $row['server']->short_name : '' }}</td>
+                                        <td class="!text-left">@if ($row['server'])<x-jersey :player="$row['server']" />@endif</td>
                                         <td class="group-start"><x-pct :value="$row['so']->ratio()" :good="0.6" /> <span class="text-xs text-subtle">{{ $row['so']->won }}/{{ $row['so']->total }}</span></td>
                                         <td><x-pct :value="$row['bp']->ratio()" :good="0.4" /> <span class="text-xs text-subtle">{{ $row['bp']->won }}/{{ $row['bp']->total }}</span></td>
                                         <td class="group-start tabular">{{ $row['us'] }}:{{ $row['them'] }}</td>
@@ -462,7 +464,7 @@
                             @foreach ($report->attackByZone as $z => $l)
                                 @continue($l->total() === 0)
                                 <tr>
-                                    <td class="!text-left">{{ $zoneName($z) }}</td>
+                                    <td class="!text-left">@if ($z !== 'none')<a href="{{ $clipUrl(null, 'attack', 'all', $z) }}" class="hover:text-brand-400" title="{{ __('Watch on video') }}">{{ $zoneName($z) }}</a>@else{{ $zoneName($z) }}@endif</td>
                                     <td class="group-start">{{ $l->total() }}</td>
                                     <td>{{ $l->count('#') }}</td><td>{{ $l->count('=') }}</td><td>{{ $l->count('/') }}</td>
                                     <td class="group-start"><x-pct :value="$l->success()" :good="0.5" /></td>
@@ -534,7 +536,7 @@
                             @php $v = $p->value(); @endphp
                             <tr>
                                 <td class="!text-left text-muted">{{ $i + 1 }}</td>
-                                <td class="!text-left"><b>{{ $p->player?->numberLabel() }}</b> {{ $p->player && ! $p->player->isAnonymous() ? $p->player->short_name : '' }}</td>
+                                <td class="!text-left"><x-jersey :player="$p->player" /></td>
                                 <td @class(['group-start font-display text-base font-bold', 'text-success-400' => $v > 0, 'text-danger-400' => $v < 0])>{{ $num($v) }}</td>
                                 <td class="font-semibold">{{ $num($p->valuePerSet()) }}</td>
                                 <td class="text-muted">{{ $num($p->valuePerTouch(), 2) }}</td>

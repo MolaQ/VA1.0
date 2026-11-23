@@ -6,6 +6,7 @@
  *   S R A B D E F   serve, reception, attack, block, dig, set, free ball
  *   1-9       after a skill: zone (attack: from, then to; serve: target)
  *   # + ! - / =     grade: records the touch
+ *   ?         mark the next touch as unclear ("to clarify")
  *   P / O     point for us / for the opponent (closes the rally)
  *   N         next rally      Space  play / pause      ← →  −/+ 3 s      Esc  clear
  */
@@ -22,6 +23,7 @@ export default (roster = {}) => ({
     buffer: '',
     bufferTimer: null,
     keyboard: true,
+    unclear: false,
 
     // The video player is the parent component (element marked data-yt).
     yt() {
@@ -65,7 +67,8 @@ export default (roster = {}) => ({
             return;
         }
 
-        this.$wire.record(this.player, this.skill, g, this.time(), this.zoneFrom, this.zoneTo);
+        this.$wire.record(this.player, this.skill, g, this.time(), this.zoneFrom, this.zoneTo, this.unclear);
+        this.unclear = false;
         this.reset();
     },
 
@@ -87,7 +90,10 @@ export default (roster = {}) => ({
 
         const key = e.key;
 
-        if (GRADES.includes(key)) {
+        if (key === '?') {
+            e.preventDefault();
+            this.unclear = !this.unclear;
+        } else if (GRADES.includes(key)) {
             e.preventDefault();
             this.grade(key);
         } else if (/^[0-9]$/.test(key)) {

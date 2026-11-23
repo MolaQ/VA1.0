@@ -5,7 +5,10 @@
  *  - load(clips)      play a list of moments ({ t, label }) one after another,
  *                     each from 3 s before to 4 s after the action
  *  - playStat(...)    asks Livewire for the clips behind a stat cell and plays them
+ *  - jump(t)          jump to the moment of one action (1 s before it) and play
  *  - currentTime()    used by the manual coding panel to timestamp actions
+ *
+ * Links from the report open the match with ?t=<seconds> or ?clip=<player>,<skill>,<filter>,<zone>.
  */
 let apiPromise = null;
 
@@ -54,7 +57,10 @@ export default (videoId) => ({
                 height: '100%',
                 playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
                 events: {
-                    onReady: () => (this.ready = true),
+                    onReady: () => {
+                        this.ready = true;
+                        this.fromUrl();
+                    },
                 },
             });
         });
@@ -125,8 +131,32 @@ export default (videoId) => ({
         this.next();
     },
 
-    playStat(playerId, skill, filter) {
-        this.$wire.clips(playerId, skill, filter).then((clips) => this.load(clips));
+    playStat(playerId, skill, filter = 'all', zone = null) {
+        this.$wire.clips(playerId, skill, filter, zone).then((clips) => this.load(clips));
+    },
+
+    jump(t) {
+        this.stopPlaylist();
+        this.seek(t - 1);
+    },
+
+    fromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const t = parseFloat(params.get('t'));
+
+        if (!Number.isNaN(t)) {
+            this.jump(t);
+
+            return;
+        }
+
+        const clip = params.get('clip');
+
+        if (clip) {
+            const [player, skill, filter, zone] = clip.split(',');
+            const num = (v) => (v && !Number.isNaN(parseInt(v)) ? parseInt(v) : null);
+            this.playStat(num(player), skill, filter || 'all', num(zone));
+        }
     },
 
     next() {

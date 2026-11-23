@@ -79,6 +79,8 @@ class ActionIngestor
                     'source' => $source,
                     'confidence' => Arr::get($item, 'confidence'),
                     'meta' => Arr::get($item, 'meta'),
+                    'needs_review' => $this->needsReview($item, $player, $source),
+                    'review_note' => Arr::get($item, 'review_note'),
                 ];
 
                 $externalId = Arr::get($item, 'external_id');
@@ -91,6 +93,14 @@ class ActionIngestor
                 }
 
                 $isNew = ! $action->exists;
+
+                // A person already confirmed or corrected this one: the analyzer must not undo it.
+                if (! $isNew && $action->reviewed_at !== null && $source === ActionSource::Ai) {
+                    $saved->push($action);
+
+                    continue;
+                }
+
                 $action->fill($attributes);
 
                 if ($isNew) {
@@ -145,6 +155,27 @@ class ActionIngestor
         $action->delete();
 
         GameActionsRecorded::dispatch($game, 0, 0, 1);
+    }
+
+    /**
+     * AI actions without a recognised player or with low confidence wait for the analyst;
+     * anyone can also flag an action explicitly.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function needsReview(array $item, ?Player $player, ActionSource $source): bool
+    {
+        if (($flag = Arr::get($item, 'needs_review')) !== null) {
+            return (bool) $flag;
+        }
+
+        if ($source !== ActionSource::Ai) {
+            return false;
+        }
+
+        $confidence = Arr::get($item, 'confidence');
+
+        return $player === null || (is_numeric($confidence) && (float) $confidence < GameAction::REVIEW_CONFIDENCE);
     }
 
     /**

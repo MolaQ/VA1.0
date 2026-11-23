@@ -490,5 +490,22 @@
     "After perfect reception (#)": "Dopo ricezione perfetta (#)",
     "After positive reception (+)": "Dopo ricezione positiva (+)",
     "After poor reception (! - /)": "Dopo ricezione scarsa (! - /)",
-    "Transition (counter-attack)": "Transizione (contrattacco)"
+    "Transition (counter-attack)": "Transizione (contrattacco)",
+    "Watch on video": "Guarda nel video",
+    "Quick pick": "Selezione rapida",
+    "Attack from zone": "Attacco dalla zona",
+    "Serve to zone": "Servizio in zona",
+    "Play these actions": "Riproduci queste azioni",
+    "Unclear, leave to clarify": "Non chiaro, da chiarire",
+    "unclear": "non chiaro",
+    "To clarify": "Da chiarire",
+    "The AI was not sure about these. Watch, pick the player or grade, confirm.": "L'AI non era sicura di queste azioni. Guarda, scegli il giocatore o il voto, conferma.",
+    "Jump to this moment": "Vai a questo momento",
+    "Confirm": "Conferma",
+    "Leave to clarify": "Lascia da chiarire",
+    "Jersey number": "Numero di maglia",
+    "Number unknown": "Numero sconosciuto",
+    "Player not recognised": "Giocatore non riconosciuto",
+    "Low AI confidence": "Bassa affidabilità AI",
+    "Marked as unclear": "Segnata come non chiara"
 }

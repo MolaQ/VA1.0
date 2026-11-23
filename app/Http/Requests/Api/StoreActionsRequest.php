@@ -39,6 +39,8 @@ class StoreActionsRequest extends FormRequest
             'actions.*.zone_to' => ['nullable', 'integer', 'between:1,9'],
             'actions.*.confidence' => ['nullable', 'numeric', 'between:0,1'],
             'actions.*.meta' => ['nullable', 'array'],
+            'actions.*.needs_review' => ['nullable', 'boolean'],
+            'actions.*.review_note' => ['nullable', 'string', 'max:255'],
         ];
     }
 }
