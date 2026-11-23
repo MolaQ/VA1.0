@@ -1,0 +1,30 @@
+[project]
+name = "vva-analyzer"
+version = "0.1.0"
+description = "VVA automatic volleyball video analysis (stage 1: rallies, score, serve)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python>=4.9",
+    "httpx>=0.27",
+    "yt-dlp>=2024.10.0",
+]
+
+[project.optional-dependencies]
+# GPU detection + OCR (torch with CUDA is installed separately, see README).
+vision = ["ultralytics>=8.3", "easyocr>=1.7"]
+server = ["fastapi>=0.110", "uvicorn>=0.29"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+vva-analyzer = "vva_analyzer.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["vva_analyzer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

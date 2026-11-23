@@ -62,8 +62,13 @@ final class GameStatsCalculator
 
         $breakPointRallies = $this->servingRallies($actions);
 
+        // Our team's actions not tied to a player yet (e.g. AI stage 1: serves before jersey numbers are read)
+        $unassigned = new PlayerStatLine;
+
         foreach ($actions as $action) {
             if ($action->player_id === null) {
+                $unassigned->add($action, $breakPointRallies->has($this->rallyKey($action)));
+
                 continue;
             }
 
@@ -78,6 +83,7 @@ final class GameStatsCalculator
 
         $totals = new PlayerStatLine;
         $lines->each(fn (PlayerStatLine $line) => $totals->merge($line));
+        $totals->merge($unassigned);
 
         $visible = $lines->values();
 
@@ -97,7 +103,7 @@ final class GameStatsCalculator
     private function servingRallies(Collection $actions): Collection
     {
         return $actions
-            ->filter(fn (GameAction $a) => $a->skill === Skill::Serve && $a->player_id !== null && $a->rally !== null)
+            ->filter(fn (GameAction $a) => $a->skill === Skill::Serve && $a->rally !== null)
             ->mapWithKeys(fn (GameAction $a) => [$this->rallyKey($a) => true]);
     }
 

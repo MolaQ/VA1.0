@@ -62,3 +62,19 @@ it('filters by set', function () {
     expect($calc->forGame($game->fresh(), 2)->totals->attackKills)->toBe(2)
         ->and($calc->forGame($game->fresh())->totals->attackKills)->toBe(3);
 });
+
+it('counts team actions without a player in the totals (AI stage 1 serves)', function () {
+    ['game' => $game] = clubWithGame();
+    $game->sets()->create(['number' => 1]);
+
+    app(ActionIngestor::class)->ingest($game, [
+        ['set' => 1, 'rally' => 1, 'skill' => 'serve', 'grade' => '#'],
+        ['set' => 1, 'rally' => 2, 'skill' => 'serve', 'grade' => '='],
+    ], ActionSource::Ai);
+
+    $stats = app(GameStatsCalculator::class)->forGame($game->fresh());
+
+    expect($stats->totals->serveTotal)->toBe(2)
+        ->and($stats->totals->serveAces)->toBe(1)
+        ->and($stats->totals->serveErrors)->toBe(1);
+});

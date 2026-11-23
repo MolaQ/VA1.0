@@ -63,3 +63,9 @@ POST /api/v1/games/42/actions
 ```bash
 composer test   # pint --test, phpstan (larastan, level 7), pest
 ```
+
+## Automatyczna analiza wideo
+
+Moduł AI jest w katalogu [`analyzer/`](analyzer/README.md): program w Pythonie uruchamiany na komputerze
+z kartą NVIDIA, który rozpoznaje wymiany, wynik i zagrywki z nagrania i wysyła je do VVA przez API.
+

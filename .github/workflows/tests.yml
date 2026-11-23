@@ -36,3 +36,26 @@ jobs:
 
       - name: Run CI Checks
         run: composer ci:check
+
+  analyzer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analyzer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install
+        run: pip install -e ".[server,dev]"
+
+      - name: Run tests
+        run: pytest -q

@@ -1,0 +1,101 @@
+# VVA Analyzer: automatyczna analiza wideo (etap 1)
+
+Program uruchamiany na komputerze z kartą NVIDIA. Ogląda nagranie meczu ze stałej kamery,
+czyta wynik z nakładki (np. Sportcam) i wysyła do VVA:
+
+- **wyniki setów** i początek każdego seta w wideo,
+- **każdą wymianę**: kto serwował, kto wygrał punkt, kiedy w nagraniu,
+- **zagrywki naszej drużyny** z oceną: `#` as, `=` błąd, `!` w grze (w tabeli: Serve Sum/Err/Ace i BP w wierszu sumy).
+
+Numery zawodników (kto serwował) dochodzą w etapie 2, pozostałe elementy w etapie 3.
+Do tego czasu zagrywki są przypisane do drużyny, a trener może je przypisać w panelu kodowania.
+
+## Jak to działa
+
+1. Pobranie nagrania z YouTube (yt-dlp).
+2. Wykrywanie piłki w każdej klatce (YOLO, 12 klatek na sekundę) i odrzucanie piłek leżących przy boisku.
+3. Odczyt punktów z nakładki co sekundę (EasyOCR), z odrzucaniem pojedynczych błędnych odczytów.
+4. Gwizdek sędziego z dźwięku (koniec wymiany).
+5. Łączenie: każda zmiana wyniku to koniec wymiany, a wymianą jest ostatnia akcja z piłką przed zmianą.
+   Zagrywa zdobywca poprzedniego punktu, a pierwszą zagrywkę seta rozpoznaje strona boiska (po kalibracji).
+6. Wyniki idą do VVA paczkami w trakcie analizy, więc statystyki widać na żywo.
+
+## Instalacja (Windows, laptop z RTX 3060)
+
+Raz, w terminalu (PowerShell):
+
+1. Zainstaluj **Python 3.12** z python.org (zaznacz „Add python.exe to PATH”) i aktualny sterownik NVIDIA.
+2. Zainstaluj **ffmpeg**: `winget install Gyan.FFmpeg` (potem otwórz nowy terminal).
+3. W katalogu projektu:
+   ```powershell
+   cd analyzer
+   py -3.12 -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+   pip install -e ".[vision,server,dev]"
+   python -c "import torch; print(torch.cuda.is_available())"
+   ```
+   Ostatnie polecenie ma wypisać `True` (karta graficzna jest widoczna).
+   Jeśli PowerShell blokuje `Activate.ps1`, wpisz raz `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+4. W VVA: **Klub → Integracje AI → utwórz token**. Skopiuj go, pokazuje się tylko raz.
+
+## Użycie
+
+Za każdym razem zaczynasz od aktywacji środowiska: `cd analyzer` i `.venv\Scripts\Activate.ps1`.
+
+**Kalibracja (raz na halę i ustawienie kamery).** Otwiera okno z klatką meczu:
+
+```powershell
+python -m vva_analyzer calibrate --url "https://www.youtube.com/watch?v=XCXJATWV9O4" --at 300
+```
+
+- Kliknij 4 narożniki boiska: najpierw dwa narożniki linii końcowej po stronie, na której **my** gramy w 1. secie,
+  potem dwa narożniki drugiej linii końcowej (w tej samej kolejności stron). Backspace cofa punkt.
+- Zaznacz prostokątem punkty lewej drużyny na nakładce i Enter, potem punkty prawej drużyny i Enter.
+- W terminalu odpowiedz, po której stronie nakładki są nasze punkty.
+
+Powstaje `calibration.json`. `--at 300` to sekunda nagrania, na której widać boisko i wynik.
+
+**Analiza meczu z wysłaniem do VVA.** Numer meczu (`--game`) jest w adresie strony meczu, np. `/games/3`:
+
+```powershell
+$env:VVA_API_TOKEN = "wklej-token"
+python -m vva_analyzer analyze --url "https://www.youtube.com/watch?v=XCXJATWV9O4" --game 3
+```
+
+Przy VVA działającym gdzie indziej niż `localhost:8000` dodaj `--api http://adres/api/v1`.
+Bez `--game` analiza tylko zapisuje raport `work\<id>.report.json` (do sprawdzenia przed wysłaniem).
+
+**Poprawki bez ponownego liczenia.** Wykrycia zapisują się w `work\<id>.detections.json`, więc ponowne
+uruchomienie (np. po zmianie kalibracji nakładki lub ustawień) trwa sekundy. `--fresh` wymusza pełną analizę.
+
+**Przycisk „Uruchom analizę AI” w VVA.** Zamiast ręcznego `analyze` możesz uruchomić usługę:
+
+```powershell
+python -m vva_analyzer serve --token "token-z-VVA" --secret "dowolne-haslo"
+```
+
+a w `.env` strony ustawić:
+
+```
+VVA_ANALYZER_URL=http://127.0.0.1:8765/jobs
+VVA_ANALYZER_TOKEN=dowolne-haslo
+```
+
+Potem `php artisan config:clear`. Działać musi też kolejka (`composer dev` ją uruchamia).
+Dodanie meczu z linkiem i zaznaczoną analizą AI wyśle go do laptopa, a postęp pokaże się na stronie meczu.
+
+## Czas i dokładność
+
+- Szacunkowo 20 do 40 minut na 2 godziny nagrania na RTX 3060 (laptop). `--fps 8` przyspiesza kosztem dokładności.
+- Wynik i kolejność serwujących są pewne, o ile nakładka jest czytelna. Asy i błędy zagrywki to w etapie 1
+  heurystyka (bardzo krótka wymiana, liczba przejść piłki nad siatką), dlatego mają niższą „pewność”.
+- Kamera z boku boiska, mniej więcej na wysokości siatki, daje najlepsze rozpoznanie strony boiska.
+
+Analizuj nagrania własnego klubu albo takie, na które masz zgodę właściciela.
+
+## Testy
+
+```powershell
+pytest
+```
