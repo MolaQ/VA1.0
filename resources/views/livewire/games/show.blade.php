@@ -79,6 +79,36 @@
                     </div>
                 </div>
                 <div x-show="emptyHint" x-cloak x-transition class="border-t border-line px-4 py-3 text-sm text-muted">{{ __('No video moments for this stat.') }}</div>
+                {{-- Quick pick: one player's (or the team's) serves, attacks from a zone... played back to back --}}
+                @if ($game->youtube_id)
+                    @php $pickPlayers = $stats->lines->filter(fn ($l) => $l->totalActions() > 0)->map(fn ($l) => $l->player)->filter()->values(); @endphp
+                    <div x-data="{ pid: null, skill: 'attack', filter: 'all', zone: null }" class="no-print space-y-2 border-t border-line px-4 py-3">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span class="label !mb-0 mr-1">{{ __('Quick pick') }}</span>
+                            <button type="button" x-on:click="pid = null" :class="pid === null ? 'bg-brand-500 text-white' : 'bg-surface-2 hover:bg-surface-3'" class="rounded-lg px-2 py-1 text-xs font-semibold">{{ __('Team') }}</button>
+                            @foreach ($pickPlayers as $pl)
+                                <button type="button" x-on:click="pid = {{ $pl->id }}" title="{{ $pl->full_name }}" :class="pid === {{ $pl->id }} ? 'bg-brand-500 text-white' : 'bg-surface-2 hover:bg-surface-3'" class="min-w-8 rounded-lg px-1.5 py-1 font-display text-sm font-bold tabular">{{ $pl->number ?? '?' }}</button>
+                            @endforeach
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            @foreach ([\App\Enums\Skill::Serve, \App\Enums\Skill::Reception, \App\Enums\Skill::Attack, \App\Enums\Skill::Block, \App\Enums\Skill::Dig, \App\Enums\Skill::Set] as $sk)
+                                <button type="button" x-on:click="skill = @js($sk->value); zone = null" :class="skill === @js($sk->value) ? 'bg-accent-500 text-white' : 'bg-surface-2 hover:bg-surface-3'" class="rounded-lg px-2 py-1 text-xs font-semibold">{{ $sk->label() }}</button>
+                            @endforeach
+                            <span class="mx-1 h-4 w-px bg-line-strong"></span>
+                            @foreach (['all' => __('All'), '#' => '#', 'pos' => '# +', '=' => '='] as $f => $label)
+                                <button type="button" x-on:click="filter = @js($f)" :class="filter === @js($f) ? 'bg-surface-3 text-fg ring-1 ring-line-strong' : 'text-muted hover:text-fg'" class="rounded-lg px-2 py-1 text-xs font-semibold">{{ $label }}</button>
+                            @endforeach
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5" x-show="skill === 'attack' || skill === 'serve'">
+                            <span class="text-xs text-muted" x-text="skill === 'attack' ? @js(__('Attack from zone')) : @js(__('Serve to zone'))"></span>
+                            <button type="button" x-on:click="zone = null" :class="zone === null ? 'bg-surface-3 text-fg ring-1 ring-line-strong' : 'text-muted hover:text-fg'" class="rounded-lg px-2 py-1 text-xs font-semibold">{{ __('All') }}</button>
+                            @foreach ([4, 3, 2, 5, 6, 1, 7, 8, 9] as $z)
+                                <button type="button" x-on:click="zone = {{ $z }}" :class="zone === {{ $z }} ? 'bg-surface-3 text-fg ring-1 ring-line-strong' : 'text-muted hover:text-fg'" class="min-w-6 rounded-lg px-1.5 py-1 text-xs font-bold tabular">{{ $z }}</button>
+                            @endforeach
+                        </div>
+                        <x-ui.button size="sm" icon="play" x-on:click="playStat(pid, skill, filter, zone)">{{ __('Play these actions') }}</x-ui.button>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -145,6 +175,10 @@
                                 @endforeach
                             </div>
                         </div>
+                        <label class="flex items-center gap-2 text-sm text-muted">
+                            <input type="checkbox" x-model="unclear" class="rounded">
+                            <span>{{ __('Unclear, leave to clarify') }} <span class="text-[10px] opacity-60">?</span></span>
+                        </label>
                         <div>
                             <p class="label">{{ __('Rally point (opponent error, opponent kill)') }}</p>
                             <div class="grid grid-cols-2 gap-1.5">
@@ -156,7 +190,7 @@
                             <summary class="cursor-pointer font-semibold text-fg">{{ __('Keyboard shortcuts') }}</summary>
                             <ul class="mt-2 space-y-1">
                                 <li><kbd>13</kbd> {{ __('jersey number') }} · <kbd>S R A B D E F</kbd> {{ __('skill') }} · <kbd>1–9</kbd> {{ __('zone') }}</li>
-                                <li><kbd># + ! - / =</kbd> {{ __('grade, records the touch') }}</li>
+                                <li><kbd># + ! - / =</kbd> {{ __('grade, records the touch') }} · <kbd>?</kbd> {{ __('unclear') }}</li>
                                 <li><kbd>P</kbd> / <kbd>O</kbd> {{ __('point us / opponent') }} · <kbd>N</kbd> {{ __('next rally') }}</li>
                                 <li><kbd>{{ __('Space') }}</kbd> {{ __('play / pause') }} · <kbd>← →</kbd> ±3 s · <kbd>Esc</kbd> {{ __('clear') }}</li>
                             </ul>
@@ -165,19 +199,59 @@
                 </x-ui.card>
             @endif
 
+            @if ($canCode && $reviewCount > 0)
+                <x-ui.card title="{{ __('To clarify') }} ({{ $reviewCount }})" subtitle="{{ __('The AI was not sure about these. Watch, pick the player or grade, confirm.') }}" padding="p-2">
+                    <ul class="max-h-[24rem] divide-y divide-line overflow-y-auto">
+                        @foreach ($review as $a)
+                            <li wire:key="rv-{{ $a->id }}" x-data="{ pid: @js($a->player_id), grade: @js($a->grade->value) }" class="space-y-2 rounded-xl px-3 py-2.5">
+                                <div class="flex items-center gap-2">
+                                    <button type="button" class="flex min-w-0 flex-1 items-center gap-2 text-left text-sm" @if ($a->video_time !== null) x-on:click="jump({{ $a->video_time }})" title="{{ __('Jump to this moment') }}" @endif>
+                                        <x-icon name="play" class="size-4 shrink-0 text-brand-400" />
+                                        <span class="w-11 shrink-0 text-xs tabular text-muted">{{ \App\Support\YouTube::formatTime($a->video_time) }}</span>
+                                        <x-jersey :player="$a->player" />
+                                        <span class="truncate">{{ $a->skill->label() }} {{ $a->grade->value }}</span>
+                                    </button>
+                                    @if ($a->set)<span class="text-xs text-subtle">S{{ $a->set->number }}</span>@endif
+                                </div>
+                                <p class="text-xs text-warning-400">{{ $a->reviewReason() }}</p>
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <select x-model.number="pid" class="input !w-auto !px-2 !py-1 text-sm tabular" aria-label="{{ __('Player') }}">
+                                        <option value="">?</option>
+                                        @foreach ($roster as $pl)
+                                            <option value="{{ $pl->id }}">{{ $pl->numberLabel() }}{{ $pl->isAnonymous() ? '' : ' '.$pl->short_name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <select x-model="grade" class="input !w-auto !px-2 !py-1 text-sm" aria-label="{{ __('Grade') }}">
+                                        @foreach ($grades as $g)<option value="{{ $g->value }}">{{ $g->value }}</option>@endforeach
+                                    </select>
+                                    <x-ui.button size="sm" icon="check" x-on:click="$wire.resolveAction({{ $a->id }}, pid || null, grade)">{{ __('Confirm') }}</x-ui.button>
+                                    <button type="button" wire:click="deleteAction({{ $a->id }})" wire:confirm="{{ __('Delete this action?') }}" class="rounded-lg p-1 text-subtle hover:text-danger-400" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                </x-ui.card>
+            @endif
+
             <x-ui.card title="{{ __('Timeline') }}" subtitle="{{ __('Click to jump in the video.') }}" padding="p-2">
                 <ul class="max-h-[28rem] divide-y divide-line overflow-y-auto">
                     @forelse ($timeline as $a)
                         <li wire:key="a-{{ $a->id }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 transition hover:bg-surface-2 {{ $loop->first ? 'animate-flash' : '' }}">
-                            <button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-left" @if ($a->video_time !== null) x-on:click="seek({{ $a->video_time }} - 2)" @endif>
+                            <button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-left" @if ($a->video_time !== null) x-on:click="jump({{ $a->video_time }})" @endif>
                                 <span class="w-12 shrink-0 text-xs tabular text-muted">{{ \App\Support\YouTube::formatTime($a->video_time) }}</span>
                                 <span class="grid size-7 shrink-0 place-items-center rounded-lg text-sm font-bold {{ $gradeStyles[$a->grade->value] }}">{{ $a->grade->value }}</span>
-                                <span class="min-w-0 truncate text-sm"><b>#{{ $a->player?->number ?? '?' }}</b> {{ $a->player && ! $a->player->isAnonymous() ? $a->player->short_name : '' }} · {{ $a->skill->label() }}</span>
+                                <span class="flex min-w-0 items-center gap-1.5 truncate text-sm"><x-jersey :player="$a->player" /> <span class="text-muted">·</span> {{ $a->skill->label() }}@if ($a->zone_from || $a->zone_to)<span class="text-xs text-subtle">{{ $a->zone_from }}{{ $a->zone_from && $a->zone_to ? '→' : '' }}{{ $a->zone_to }}</span>@endif</span>
                             </button>
+                            @if ($a->needs_review)
+                                <span class="text-warning-400" title="{{ __('To clarify') }}: {{ $a->reviewReason() }}"><x-icon name="flag" class="size-4" /></span>
+                            @endif
                             @if ($a->source === \App\Enums\ActionSource::Ai)
                                 <x-ui.badge tone="accent" title="{{ __('Confidence') }} {{ $a->confidence !== null ? round($a->confidence * 100).'%' : '–' }}">AI</x-ui.badge>
                             @endif
                             @if ($a->set)<span class="text-xs text-subtle">S{{ $a->set->number }}</span>@endif
+                            @if ($canCode && ! $a->needs_review)
+                                <button type="button" wire:click="flagAction({{ $a->id }})" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-warning-400 group-hover:opacity-100" title="{{ __('Leave to clarify') }}" aria-label="{{ __('Leave to clarify') }}"><x-icon name="flag" class="size-4" /></button>
+                            @endif
                             @if ($canCode)
                                 <button type="button" wire:click="deleteAction({{ $a->id }})" wire:confirm="{{ __('Delete this action?') }}" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-danger-400 group-hover:opacity-100" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
                             @endif

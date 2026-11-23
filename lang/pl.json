@@ -490,5 +490,22 @@
     "After perfect reception (#)": "Po perfekcyjnym przyjęciu (#)",
     "After positive reception (+)": "Po pozytywnym przyjęciu (+)",
     "After poor reception (! - /)": "Po słabym przyjęciu (! - /)",
-    "Transition (counter-attack)": "Kontra (kontratak)"
+    "Transition (counter-attack)": "Kontra (kontratak)",
+    "Watch on video": "Zobacz na wideo",
+    "Quick pick": "Szybki wybór",
+    "Attack from zone": "Atak ze strefy",
+    "Serve to zone": "Zagrywka w strefę",
+    "Play these actions": "Odtwórz te akcje",
+    "Unclear, leave to clarify": "Niejasne, zostaw do wyjaśnienia",
+    "unclear": "niejasne",
+    "To clarify": "Do wyjaśnienia",
+    "The AI was not sure about these. Watch, pick the player or grade, confirm.": "AI nie była pewna tych akcji. Obejrzyj, wybierz zawodnika lub ocenę i zatwierdź.",
+    "Jump to this moment": "Przejdź do tej chwili w filmie",
+    "Confirm": "Zatwierdź",
+    "Leave to clarify": "Zostaw do wyjaśnienia",
+    "Jersey number": "Numer na koszulce",
+    "Number unknown": "Numer nieznany",
+    "Player not recognised": "Nie rozpoznano zawodnika",
+    "Low AI confidence": "Niska pewność AI",
+    "Marked as unclear": "Oznaczone jako niejasne"
 }
