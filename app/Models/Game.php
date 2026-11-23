@@ -94,6 +94,24 @@ class Game extends Model
         return $this->hasMany(GameRally::class);
     }
 
+    /**
+     * Player positions for the 2D court view.
+     *
+     * @return HasMany<GameFrame, $this>
+     */
+    public function frames(): HasMany
+    {
+        return $this->hasMany(GameFrame::class);
+    }
+
+    /**
+     * @return HasMany<GameTrack, $this>
+     */
+    public function tracks(): HasMany
+    {
+        return $this->hasMany(GameTrack::class);
+    }
+
     public function title(): string
     {
         $home = $this->team->name ?? __('Team');

@@ -10,9 +10,12 @@ use App\Jobs\RequestVideoAnalysis;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
 use App\Models\GameAction;
+use App\Models\GameFrame;
+use App\Models\GameTrack;
 use App\Models\GameRally;
 use App\Models\Player;
 use App\Services\ActionIngestor;
+use App\Stats\PassQuality;
 use App\Stats\GameStatsCalculator;
 use App\Support\Visibility;
 use App\Support\YouTube;
@@ -234,6 +237,114 @@ class GameShow extends Component
         ]);
     }
 
+    /**
+     * Player positions for the 2D court view in a window of the video, plus the jersey
+     * numbers the analyst gave to analyzer tracks.
+     *
+     * @return array{frames: list<array<string, mixed>>, labels: array<int, array{team: string|null, n: int|null}>}
+     */
+    public function frames(float $from, float $to): array
+    {
+        $from = max(0, $from);
+        $to = min($from + 300, max($from, $to));
+
+        return [
+            'frames' => $this->game->frames()->whereBetween('t', [$from, $to])->orderBy('t')->get()
+                ->map(fn (GameFrame $f) => $f->toClient())->all(),
+            'labels' => $this->game->tracks()->get()
+                ->mapWithKeys(fn (GameTrack $l) => [$l->track => ['team' => $l->team, 'n' => $l->number]])->all(),
+        ];
+    }
+
+    /**
+     * Positions are automatic; when the AI lost a jersey number or is unsure, the analyst
+     * gives the number (and team) to the analyzer track: every frame of it shows the number.
+     */
+    public function labelTrack(int $track, ?int $number, ?string $team = null): void
+    {
+        Gate::authorize('code', $this->game);
+        abort_unless($track >= 0 && ($number === null || ($number >= 0 && $number <= 99)), 422);
+
+        $this->game->tracks()->updateOrCreate(['track' => $track], [
+            'number' => $number,
+            'team' => in_array($team, [GameRally::US, GameRally::THEM], true) ? $team : null,
+        ]);
+    }
+
+    /**
+     * Which half of the camera picture we defend in a set (the 2D view and ball points need it).
+     */
+    public function setOurSide(int $number, string $side): void
+    {
+        Gate::authorize('code', $this->game);
+        abort_unless($number >= 1 && $number <= 5 && in_array($side, ['near', 'far'], true), 422);
+
+        $this->game->sets()->firstOrCreate(['number' => $number])->update(['our_side' => $side]);
+    }
+
+    /**
+     * Serves and receptions around a moment, to attach the ball's landing point to one of them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function ballActions(float $t): array
+    {
+        return $this->game->actions()
+            ->with(['player:id,number,first_name,last_name,nickname'])
+            ->whereIn('skill', [Skill::Serve->value, Skill::Reception->value])
+            ->whereBetween('video_time', [$t - 8, $t + 8])
+            ->orderByRaw('abs(video_time - ?)', [$t])->limit(6)->get()
+            ->map(fn (GameAction $a) => [
+                'id' => $a->id,
+                't' => $a->video_time,
+                'skill' => $a->skill->value,
+                'grade' => $a->grade->value,
+                'label' => trim(($a->player?->numberLabel() ?? '?').' · '.$a->skill->label().' '.$a->grade->value),
+                'from' => $a->from_x !== null ? [$a->from_x, $a->from_y] : null,
+                'to' => $a->to_x !== null ? [$a->to_x, $a->to_y] : null,
+            ])->all();
+    }
+
+    /**
+     * Ball point of a serve or reception, in OUR team's frame (x 0..9 as we face the net,
+     * y 0 = our end line, 9 = net, 18 = their end line).
+     * Serve: `to` = where it landed. Reception: `from` = contact, `to` = where the pass went.
+     *
+     * @return array{suggested: string|null, zone: int|null}
+     */
+    public function setBallPoint(int $actionId, string $which, float $x, float $y): array
+    {
+        Gate::authorize('code', $this->game);
+        abort_unless(in_array($which, ['from', 'to'], true), 422);
+
+        $action = $this->game->actions()->findOrFail($actionId);
+        $x = round(max(-4, min(13, $x)), 2);
+        $y = round(max(-6, min(24, $y)), 2);
+        $action->fill([$which.'_x' => $x, $which.'_y' => $y]);
+
+        $suggested = null;
+        $zone = null;
+
+        if ($action->skill === Skill::Reception && $which === 'to') {
+            $suggested = PassQuality::reception($x, $y)->value;
+        }
+
+        if ($action->skill === Skill::Serve && $which === 'to') {
+            $zone = PassQuality::serveZone($x, $y);
+            $action->zone_to ??= $zone;
+        }
+
+        if ($action->skill === Skill::Reception && $which === 'from') {
+            // where the serve was received, in the receiving team's frame: zone 1..9 of our half
+            $zone = PassQuality::serveZone(9 - $x, 18 - $y);
+            $action->zone_from ??= $zone;
+        }
+
+        $action->save();
+
+        return ['suggested' => $suggested, 'zone' => $zone];
+    }
+
     public function nextRally(): void
     {
         $this->rally++;
@@ -334,6 +445,11 @@ class GameShow extends Component
                 : collect(),
             'reviewCount' => $canCode ? $game->actions()->where('needs_review', true)->count() : 0,
             'skills' => [Skill::Serve, Skill::Reception, Skill::Attack, Skill::Block, Skill::Dig, Skill::Set],
+            'courtSets' => $game->sets->map(fn ($set) => [
+                'number' => $set->number,
+                'start' => $set->video_start,
+                'side' => $set->our_side,
+            ])->values()->all(),
             'grades' => Grade::cases(),
         ])->title($game->title());
     }

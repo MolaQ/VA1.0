@@ -507,5 +507,20 @@
     "Number unknown": "Numero sconosciuto",
     "Player not recognised": "Giocatore non riconosciuto",
     "Low AI confidence": "Bassa affidabilità AI",
-    "Marked as unclear": "Segnata come non chiara"
+    "Marked as unclear": "Segnata come non chiara",
+    "Court view": "Campo 2D",
+    "No player positions for this moment yet.": "Nessuna posizione dei giocatori per questo momento.",
+    "Positions from the AI analysis.": "Posizioni dall'analisi AI.",
+    "Which half of the picture we play on in this set": "In quale metà dell'immagine giochiamo in questo set",
+    "Swap sides": "Inverti i lati",
+    "Ball point": "Punto palla",
+    "Who is this?": "Chi è?",
+    "The number is kept for as long as the AI follows this player.": "Il numero resta finché l'AI segue questo giocatore.",
+    "No serve or reception within 8 s of this moment.": "Nessuna battuta o ricezione entro 8 s da questo momento.",
+    "Click where the ball was received.": "Clicca dove è stata ricevuta la palla.",
+    "Click where the pass went (the ring = 1 m around the target).": "Clicca dove è andata la ricezione (il cerchio = 1 m intorno al bersaglio).",
+    "Click where the serve landed or was received.": "Clicca dove la battuta è caduta o è stata ricevuta.",
+    "Saved.": "Salvato.",
+    "Suggested reception grade": "Valutazione suggerita della ricezione",
+    "Apply": "Applica"
 }

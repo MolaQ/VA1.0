@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\ActionController;
 use App\Http\Controllers\Api\V1\AgentController;
 use App\Http\Controllers\Api\V1\AnalysisController;
+use App\Http\Controllers\Api\V1\FrameController;
 use App\Http\Controllers\Api\V1\GameController;
 use App\Http\Controllers\Api\V1\RallyController;
 use App\Http\Controllers\Api\V1\SetController;
@@ -24,6 +25,8 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:api'])->name('api.')-
     Route::get('/games/{game}', [GameController::class, 'show'])->name('games.show');
     Route::post('/games/{game}/actions', [ActionController::class, 'store'])->name('games.actions.store');
     Route::delete('/games/{game}/actions', [ActionController::class, 'destroy'])->name('games.actions.destroy');
+    Route::post('/games/{game}/frames', [FrameController::class, 'store'])->name('games.frames.store');
+    Route::delete('/games/{game}/frames', [FrameController::class, 'destroy'])->name('games.frames.destroy');
     Route::post('/games/{game}/rallies', [RallyController::class, 'store'])->name('games.rallies.store');
     Route::put('/games/{game}/sets/{number}', [SetController::class, 'update'])->whereNumber('number')->name('games.sets.update');
     Route::patch('/games/{game}/analysis', [AnalysisController::class, 'update'])->name('games.analysis.update');

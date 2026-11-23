@@ -507,5 +507,20 @@
     "Number unknown": "Numer nieznany",
     "Player not recognised": "Nie rozpoznano zawodnika",
     "Low AI confidence": "Niska pewność AI",
-    "Marked as unclear": "Oznaczone jako niejasne"
+    "Marked as unclear": "Oznaczone jako niejasne",
+    "Court view": "Boisko 2D",
+    "No player positions for this moment yet.": "Brak pozycji zawodników dla tej chwili.",
+    "Positions from the AI analysis.": "Pozycje z analizy AI.",
+    "Which half of the picture we play on in this set": "Na której połowie obrazu gramy w tym secie",
+    "Swap sides": "Zamień strony",
+    "Ball point": "Punkt piłki",
+    "Who is this?": "Kto to?",
+    "The number is kept for as long as the AI follows this player.": "Numer zostaje, dopóki AI śledzi tego zawodnika.",
+    "No serve or reception within 8 s of this moment.": "Brak zagrywki ani przyjęcia w promieniu 8 s od tej chwili.",
+    "Click where the ball was received.": "Kliknij, gdzie piłka została przyjęta.",
+    "Click where the pass went (the ring = 1 m around the target).": "Kliknij, gdzie poszło przyjęcie (okrąg = 1 m wokół celu).",
+    "Click where the serve landed or was received.": "Kliknij, gdzie zagrywka spadła lub została przyjęta.",
+    "Saved.": "Zapisano.",
+    "Suggested reception grade": "Sugerowana ocena przyjęcia",
+    "Apply": "Zastosuj"
 }

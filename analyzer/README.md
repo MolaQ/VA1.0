@@ -95,6 +95,21 @@ VVA_ANALYZER_TOKEN=dowolne-haslo
 Potem `php artisan config:clear`. Działać musi też kolejka (`composer dev` ją uruchamia).
 Dodanie meczu z linkiem i zaznaczoną analizą AI wyśle go do laptopa, a postęp pokaże się na stronie meczu.
 
+## Pozycje zawodników (boisko 2D pod filmem)
+
+Ten sam przebieg YOLO, który szuka piłki, zwraca też ludzi (klasa COCO „person”), więc pozycje
+nic nie kosztują czasowo. Dla każdej osoby punkt stóp (środek dolnej krawędzi ramki) jest
+przeliczany homografią z kalibracji boiska na metry (x 0..9 w poprzek, y 0..18 wzdłuż,
+0 = linia końcowa bliżej kamery, 9 = siatka). Osoby daleko poza boiskiem (ławka, sędziowie,
+widzowie) są odrzucane, a prosty tracker nadaje każdemu zawodnikowi stały identyfikator
+śladu. Kierunek ciała (trójkącik przy kropce) to kierunek ruchu; stojący zawodnik „patrzy”
+na siatkę. Drużyna wynika z połowy boiska i seta (strony zmieniają się co set).
+
+Co 0,5 s powstaje klatka pozycji, wysyłana na końcu analizy do `POST /api/v1/games/{id}/frames`.
+Wymaga kalibracji boiska i modelu COCO (własny model tylko-piłka nie daje ludzi).
+Numerów koszulek AI jeszcze nie czyta: analityk klika kropkę i wpisuje numer, a numer
+zostaje na całym śladzie. Stare pliki `*.detections.json` nie mają pozycji: uruchom z `--fresh`.
+
 ## Czas i dokładność
 
 - Szacunkowo 20 do 40 minut na 2 godziny nagrania na RTX 3060 (laptop). `--fps 8` przyspiesza kosztem dokładności.

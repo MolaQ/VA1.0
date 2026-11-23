@@ -86,6 +86,12 @@ export default (videoId) => ({
         this.player.getPlayerState() === 1 ? this.player.pauseVideo() : this.player.playVideo();
     },
 
+    pause() {
+        if (this.ready) {
+            this.player.pauseVideo();
+        }
+    },
+
     nudge(seconds) {
         if (this.ready) {
             this.player.seekTo(Math.max(0, this.player.getCurrentTime() + seconds), true);
