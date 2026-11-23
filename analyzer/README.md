@@ -24,17 +24,22 @@ Do tego czasu zagrywki są przypisane do drużyny, a trener może je przypisać 
 
 Raz, w terminalu (PowerShell):
 
-1. Zainstaluj **Python 3.12** z python.org (zaznacz „Add python.exe to PATH”) i aktualny sterownik NVIDIA.
-2. Zainstaluj **ffmpeg**: `winget install Gyan.FFmpeg` (potem otwórz nowy terminal).
+1. Zainstaluj **Python 3.12**: z instalatorem Pythona wystarczy `py install 3.12`, w przeciwnym razie z python.org
+   (zaznacz „Add python.exe to PATH”). Zaktualizuj też sterownik NVIDIA.
+2. Zainstaluj **ffmpeg**: `winget install Gyan.FFmpeg --source winget` (potem otwórz nowy terminal i sprawdź `ffmpeg -version`).
+   Przy błędzie certyfikatu pobierz `ffmpeg-release-essentials.zip` z https://www.gyan.dev/ffmpeg/builds/, rozpakuj do `C:\ffmpeg`
+   i dodaj `C:\ffmpeg\bin` do zmiennej PATH.
 3. W katalogu projektu:
    ```powershell
    cd analyzer
    py -3.12 -m venv .venv
    .venv\Scripts\Activate.ps1
-   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-   pip install -e ".[vision,server,dev]"
+   python -m pip install --upgrade pip
+   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+   python -m pip install -e ".[vision,server,dev]"
    python -c "import torch; print(torch.cuda.is_available())"
    ```
+   Po aktywacji linia terminala zaczyna się od `(.venv)`; wszystkie dalsze polecenia wpisuj tylko w takim terminalu.
    Ostatnie polecenie ma wypisać `True` (karta graficzna jest widoczna).
    Jeśli PowerShell blokuje `Activate.ps1`, wpisz raz `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 4. W VVA: **Klub → Integracje AI → utwórz token**. Skopiuj go, pokazuje się tylko raz.
