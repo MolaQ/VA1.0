@@ -167,6 +167,7 @@ it('filters the report by set', function () {
 
 it('shows the report to staff and players but not to parents', function () {
     ['club' => $club, 'game' => $game, 'players' => $players] = scoutedGame();
+    $this->withHeader('Accept-Language', 'pl-PL,pl;q=0.9');
 
     $this->actingAs(member($club, Role::Trainer))->get("/games/{$game->id}/report")
         ->assertOk()->assertSee('Raport meczu')->assertSee('Użyteczność zawodników')->assertSee('Dystrybucja rozegrania');
