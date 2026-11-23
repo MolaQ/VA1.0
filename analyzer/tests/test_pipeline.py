@@ -43,3 +43,11 @@ def test_detection_cache_round_trip(tmp_path: Path):
     other = Job(Calibration(), Settings(), tmp_path)
     other._load(tmp_path / "c.json")
     assert other.obs[0].half == "far" and other.readings[0].left == 3
+
+
+def test_court_halves_follow_the_current_calibration(tmp_path: Path):
+    cal = Calibration(court=[(0.30, 0.40), (0.25, 0.80), (0.75, 0.80), (0.70, 0.40)], court_ref="attack")
+    job = Job(cal, Settings(), tmp_path)
+    job.obs = [BallObs(1.0, 0.2, 0.6, 0.5, "far"), BallObs(2.0, 0.8, 0.6, 0.5, None)]
+    job._rehalf()
+    assert [o.half for o in job.obs] == ["near", "far"]

@@ -45,6 +45,7 @@ class Job:
         cache = self.workdir / f"{video.stem}.detections.json"
         if reuse and cache.exists():
             self._load(cache)
+            self._rehalf()  # the court calibration may have changed since the scan
             self.progress(85, "Używam zapisanych wykryć")
             if self.cal.has_scoreboard and (rescore or not self.readings):
                 self._read_scores(video, vid)
@@ -118,6 +119,18 @@ class Job:
                         log.warning("partial publish failed: %s", e)
         if batch:
             flush()
+
+    def _rehalf(self) -> None:
+        """Court half of every ball position from the current calibration (coordinates are normalised)."""
+        from .court import NetLine, homography
+
+        if not self.cal.has_court:
+            for o in self.obs:
+                o.half = None
+            return
+        net = NetLine(homography(self.cal.court, 1, 1, self.cal.court_ref))
+        for o in self.obs:
+            o.half = net.half(o.x, o.y)
 
     def _read_scores(self, video: Path, vid) -> None:
         """Only the score overlay, once per second (minutes instead of a full scan)."""
