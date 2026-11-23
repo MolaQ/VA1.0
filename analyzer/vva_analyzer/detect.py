@@ -31,7 +31,7 @@ class BallDetector:
         return [ball for ball, _ in self.detect_all(batch, people=False)]
 
     def detect_all(self, batch: list, people: bool = True):
-        """Per frame: (best ball or None, people as [(feet x, feet y, conf)] normalised)."""
+        """Per frame: (best ball or None, people as [(feet x, feet y, conf, box w, box h)] normalised)."""
         people = people and self.coco
         classes = [SPORTS_BALL, PERSON] if people else self.classes
         results = self.model.predict(
@@ -48,7 +48,7 @@ class BallDetector:
                 for c, conf, (x, y, w, h) in zip(cls, confs, boxes):
                     if int(c) == PERSON:
                         if conf >= self.s.person_conf:
-                            persons.append((float(x), float(y + h / 2), float(conf)))  # feet: bottom centre
+                            persons.append((float(x), float(y + h / 2), float(conf), float(w), float(h)))  # feet: bottom centre
                     elif conf >= self.s.ball_conf and (ball is None or conf > ball[2]):
                         ball = (float(x), float(y), float(conf))
             out.append((ball, persons))

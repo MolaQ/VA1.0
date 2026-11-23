@@ -66,6 +66,8 @@ class Settings:
     players: bool = True
     person_conf: float = 0.35
     positions_every_s: float = 0.5  # one frame of player positions every this many seconds
+    jerseys: bool = True  # read jersey numbers (OCR on the torso)
+    jersey_every_s: float = 2.0  # how often each visible player's number is tried
     # Ball activity -> rallies
     gap_merge_s: float = 1.2  # detections closer than this belong to one activity segment
     min_segment_s: float = 1.0

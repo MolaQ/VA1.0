@@ -12,7 +12,7 @@ from . import actions as act
 from . import rallies as ral
 from .api import VvaClient
 from .config import Calibration, Settings
-from .players import Person, build_frames
+from .players import Person, build_frames, track_players
 from .scoreboard import Reading, is_replay, replay_spans, stabilise
 
 log = logging.getLogger("vva")
@@ -95,13 +95,25 @@ class Job:
         next_ocr = 0.0
         want_people = self.s.players and self.cal.has_court
         next_pos = [0.0]
+        next_num = [0.0]
+        jerseys = None
+        if want_people and self.s.jerseys:
+            try:
+                from .jersey import JerseyReader
+                jerseys = JerseyReader(ocr.reader if ocr else None, gpu=self.device not in (None, "cpu"))
+            except Exception as e:  # numbers are extra: positions still work without OCR
+                log.warning("jersey numbers off: %s", e)
         last_pct = -1
         last_publish = 0
 
         def flush():
-            for t, (found, persons) in zip(times, detector.detect_all(batch, people=want_people)):
+            for t, frame, (found, persons) in zip(times, batch, detector.detect_all(batch, people=want_people)):
                 if want_people and t >= next_pos[0]:
-                    self.people.append((t, [Person(x, y, c) for x, y, c in persons]))
+                    people = [Person(x, y, c, w_, h_) for x, y, c, w_, h_ in persons]
+                    if jerseys and t >= next_num[0]:
+                        jerseys.read(frame, people)
+                        next_num[0] = t + self.s.jersey_every_s
+                    self.people.append((t, people))
                     next_pos[0] = t + self.s.positions_every_s
                 if found is None:
                     continue
@@ -171,11 +183,16 @@ class Job:
         scores = stabilise(self.readings, self.cal, s)
         rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1, self.first_serve)
         numbered = ral.assign_servers(rallies, self.lineups)
-        frames = self.player_frames(sets, spans)
+        tracking = self.tracking(spans)
+        frames = self.player_frames(sets, tracking)
+        receptions, serve_extra = [], {}
+        if tracking is not None:
+            from .touches import ball_actions
+            receptions, serve_extra = ball_actions(rallies, live, tracking, self.cal.our_side_set1)
         return {
             "sets": [asdict(x) for x in sets],
             "rallies": act.report(rallies),
-            "actions": act.serve_actions(rallies),
+            "actions": act.serve_actions(rallies, serve_extra) + receptions,
             "frames": frames,
             "stats": {
                 "score_reads_ok": sum(1 for r in self.readings if r.left is not None and r.right is not None),
@@ -189,18 +206,27 @@ class Job:
                 "serves_with_player": numbered,
                 "rallies_with_video_time": sum(1 for r in rallies if r.start is not None),
                 "position_frames": len(frames),
+                "numbered_tracks": len(tracking.numbers) if tracking else 0,
+                "receptions": len(receptions),
+                "serves_with_point": len(serve_extra),
             },
         }
 
-    def player_frames(self, sets, replays) -> list[dict]:
-        """Player positions in court metres for the 2D view (needs the court calibration)."""
+    def tracking(self, replays):
+        """Players tracked on the court (needs the court calibration and the people detections)."""
         if not self.cal.has_court or not self.people:
-            return []
+            return None
         from .court import homography
 
         h = homography(self.cal.court, 1, 1, self.cal.court_ref)
+        return track_players(self.people, h, replays)
+
+    def player_frames(self, sets, tracking) -> list[dict]:
+        """Player positions in court metres for the 2D view."""
+        if tracking is None:
+            return []
         starts = [(x.number, x.video_start) for x in sets if x.video_start is not None]
-        return build_frames(self.people, h, starts, self.cal.our_side_set1, replays)
+        return build_frames([], None, starts, self.cal.our_side_set1, tracking=tracking)
 
     def publish(self, result: dict, final: bool) -> None:
         assert self.client and self.game_id
@@ -246,7 +272,8 @@ class Job:
         data = {
             "obs": [[o.t, o.x, o.y, o.conf, o.half] for o in self.obs],
             "readings": [[r.t, r.left, r.right, int(r.replay)] for r in self.readings],
-            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2)] for p in ps]] for t, ps in self.people],
+            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2), round(p.w, 4), round(p.h, 4), p.num, round(p.num_conf, 2)]
+                            for p in ps]] for t, ps in self.people],
         }
         path.write_text(json.dumps(data), encoding="utf-8")
 
@@ -254,7 +281,7 @@ class Job:
         data = json.loads(path.read_text(encoding="utf-8"))
         self.obs = [ral.BallObs(t, x, y, c, h) for t, x, y, c, h in data["obs"]]
         self.readings = [Reading(r[0], r[1], r[2], bool(r[3]) if len(r) > 3 else False) for r in data["readings"]]
-        self.people = [(t, [Person(x, y, c) for x, y, c in ps]) for t, ps in data.get("people", [])]
+        self.people = [(t, [Person(*p) for p in ps]) for t, ps in data.get("people", [])]
         self.replay_checked = not data["readings"] or len(data["readings"][0]) > 3
 
 
