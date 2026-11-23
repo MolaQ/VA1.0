@@ -127,17 +127,29 @@ def suggest(frame) -> list[tuple[float, float]] | None:
         return ac.a * y + ac.b, y
 
     lines = _group(across, tol=w * 0.015)
-    left = [l for l in lines if cross(far, l)[0] < net - w * 0.04 and cross(near, l)[0] < net - w * 0.02]
-    right = [l for l in lines if cross(far, l)[0] > net + w * 0.04 and cross(near, l)[0] > net + w * 0.02]
+    slack = w * 0.01
+    # Seen from the side stand, lines across the court lean outwards towards the camera.
+    left = [l for l in lines if cross(far, l)[0] < net - w * 0.04 and cross(near, l)[0] <= cross(far, l)[0] + slack]
+    right = [l for l in lines if cross(far, l)[0] > net + w * 0.04 and cross(near, l)[0] >= cross(far, l)[0] - slack]
     if not left or not right:
         return None
 
-    def pick(cands: list[Line]) -> Line:
-        # strongest among the ones closest to the net (end lines are further out)
-        best = max(c.weight for c in cands)
-        strong = [c for c in cands if c.weight >= best * 0.35]
-        return min(strong, key=lambda c: abs(cross(far, c)[0] - net))
+    def ratio(a: float, b: float) -> float:
+        return min(a, b) / max(a, b) if a > 0 and b > 0 else 0.0
 
-    la, ra = pick(left), pick(right)
+    # The two attack lines sit symmetrically around the net; the end lines do too, but further out.
+    scored = []
+    for la in left:
+        for ra in right:
+            sym = ratio(net - cross(far, la)[0], cross(far, ra)[0] - net) * \
+                ratio(net - cross(near, la)[0], cross(near, ra)[0] - net)
+            if sym < 0.6:
+                continue
+            dist = (cross(far, ra)[0] - cross(far, la)[0]) / w
+            scored.append((la, ra, (la.weight + ra.weight) * sym, dist))
+    if not scored:
+        return None
+    best = max(x[2] for x in scored)
+    la, ra, _, _ = min((x for x in scored if x[2] >= best * 0.25), key=lambda x: x[3])
     pts = [cross(far, la), cross(near, la), cross(near, ra), cross(far, ra)]
     return [(x / w, y / h) for x, y in pts]

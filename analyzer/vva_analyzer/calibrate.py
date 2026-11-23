@@ -49,8 +49,9 @@ def run(frame, existing: Calibration | None = None) -> Calibration:
         for i, p in enumerate(points):
             cv2.circle(view, tuple(p), 9, (0, 200, 255), -1)
             cv2.putText(view, str(i + 1), (p[0] + 12, p[1] - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 255), 2)
-        cv2.rectangle(view, (0, 0), (w, 56), (0, 0, 0), -1)
-        cv2.putText(view, help_auto if found else help_manual, (16, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        # help at the bottom: the score overlay is usually at the top
+        cv2.rectangle(view, (0, h - 56), (w, h), (0, 0, 0), -1)
+        cv2.putText(view, help_auto if found else help_manual, (16, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         cv2.imshow(win, view)
         key = cv2.waitKey(20) & 0xFF
         if key in (13, 10) and len(points) == 4:
