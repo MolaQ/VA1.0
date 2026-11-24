@@ -79,7 +79,7 @@ class GameRallies extends Component
 
         // a person looked at it: the analyzer must not undo the correction
         if ($action->source === ActionSource::Ai) {
-            $action->reviewed_at = now();
+            $action->fill(['reviewed_at' => now()]);
         }
 
         $action->needs_review = $action->needs_review && $action->player_id === null;
