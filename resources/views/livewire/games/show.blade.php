@@ -20,7 +20,7 @@
                 <span>{{ $game->is_home ? __('Home') : __('Away') }}</span>
             </p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
             <div class="text-right">
                 <p @class(['font-display text-5xl font-bold tabular leading-none', 'text-success-400' => $won === true, 'text-danger-400' => $won === false])>{{ $game->result() }}</p>
                 <p class="mt-1 flex justify-end gap-1.5 text-xs text-muted tabular">
@@ -55,11 +55,17 @@
         </div>
     @endif
 
-    <div class="grid gap-6 xl:grid-cols-12">
+    {{--
+        Layout: the video stays in view while the analyst browses actions.
+        Phones / tablets / narrow laptops: the player sticks under the top bar and the panel scrolls below it.
+        Wide screens (xl+): video + court on the left, the panel on the right sticks to the viewport
+        and scrolls inside, so browsing the timeline never scrolls the page (or the video) away.
+    --}}
+    <div class="grid gap-4 xl:grid-cols-12 xl:grid-rows-[auto_1fr] xl:gap-6">
         {{-- Video --}}
-        <div class="xl:col-span-8">
-            <div class="card overflow-hidden">
-                <div class="relative aspect-video bg-black" wire:ignore>
+        <div x-ref="screen" class="sticky top-16 z-20 -mx-4 scroll-mt-16 sm:-mx-6 xl:static xl:col-span-7 xl:row-start-1 xl:mx-0 2xl:col-span-8">
+            <div class="card overflow-hidden rounded-none border-x-0 bg-black shadow-xl sm:rounded-2xl sm:border-x xl:shadow-none">
+                <div class="relative mx-auto aspect-video w-full max-w-[calc(40dvh*16/9)] bg-black xl:max-w-none" wire:ignore>
                     @if ($game->youtube_id)
                         <div x-ref="frame" class="size-full"></div>
                     @else
@@ -79,13 +85,63 @@
                     </div>
                 </div>
                 <div x-show="emptyHint" x-cloak x-transition class="border-t border-line px-4 py-3 text-sm text-muted">{{ __('No video moments for this stat.') }}</div>
+            </div>
+        </div>
+
+        {{-- Side panel: timeline, quick pick, coding, review queue as tabs --}}
+        @php
+            $tabs = ['timeline' => __('Timeline')];
+            if ($game->youtube_id) { $tabs['pick'] = __('Quick pick'); }
+            if ($canCode) { $tabs['coding'] = __('Coding'); }
+            if ($canCode && $reviewCount > 0) { $tabs['review'] = __('To clarify'); }
+        @endphp
+        <section x-data="matchPanel(@js(array_keys($tabs)))" class="card flex min-h-0 flex-col overflow-hidden animate-fade-up xl:sticky xl:top-20 xl:col-span-5 xl:col-start-8 xl:row-span-2 xl:row-start-1 xl:h-[calc(100dvh-6rem)] 2xl:col-span-4 2xl:col-start-9">
+            <nav class="flex shrink-0 flex-wrap gap-1 border-b border-line p-1.5" role="tablist">
+                @foreach ($tabs as $key => $label)
+                    <button type="button" role="tab" x-on:click="show(@js($key))" :aria-selected="tab === @js($key)"
+                            :class="tab === @js($key) ? 'bg-surface-3 text-fg shadow' : 'text-muted hover:text-fg'"
+                            class="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-semibold transition">
+                        {{ $label }}
+                        @if ($key === 'timeline')<span class="text-xs tabular opacity-60">{{ $timeline->count() }}</span>@endif
+                        @if ($key === 'review')<span class="rounded-full bg-warning-500/20 px-1.5 text-xs tabular text-warning-400">{{ $reviewCount }}</span>@endif
+                    </button>
+                @endforeach
+            </nav>
+            <div class="xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain">
+                <div x-show="tab === 'timeline'" class="p-2">
+                    <p class="px-3 pb-1 pt-1 text-xs text-muted">{{ __('Click to jump in the video.') }}</p>
+                <ul class="divide-y divide-line">
+                    @forelse ($timeline as $a)
+                        <li wire:key="a-{{ $a->id }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 transition hover:bg-surface-2 {{ $loop->first ? 'animate-flash' : '' }}">
+                            <button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-left" @if ($a->video_time !== null) x-on:click="jump({{ $a->video_time }})" @endif>
+                                <span class="w-12 shrink-0 text-xs tabular text-muted">{{ \App\Support\YouTube::formatTime($a->video_time) }}</span>
+                                <span class="grid size-7 shrink-0 place-items-center rounded-lg text-sm font-bold {{ $gradeStyles[$a->grade->value] }}">{{ $a->grade->value }}</span>
+                                <span class="flex min-w-0 items-center gap-1.5 text-sm"><x-jersey :player="$a->player" class="overflow-hidden" /> <span class="shrink-0 text-muted">·</span> <span class="shrink-0">{{ $a->skill->label() }}</span>@if ($a->zone_from || $a->zone_to)<span class="text-xs text-subtle">{{ $a->zone_from }}{{ $a->zone_from && $a->zone_to ? '→' : '' }}{{ $a->zone_to }}</span>@endif</span>
+                            </button>
+                            @if ($a->needs_review)
+                                <span class="text-warning-400" title="{{ __('To clarify') }}: {{ $a->reviewReason() }}"><x-icon name="flag" class="size-4" /></span>
+                            @endif
+                            @if ($a->source === \App\Enums\ActionSource::Ai)
+                                <x-ui.badge tone="accent" class="max-sm:hidden" title="{{ __('Confidence') }} {{ $a->confidence !== null ? round($a->confidence * 100).'%' : '–' }}">AI</x-ui.badge>
+                            @endif
+                            @if ($a->set)<span class="text-xs text-subtle">S{{ $a->set->number }}</span>@endif
+                            @if ($canCode && ! $a->needs_review)
+                                <button type="button" wire:click="flagAction({{ $a->id }})" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-warning-400 group-hover:opacity-100" title="{{ __('Leave to clarify') }}" aria-label="{{ __('Leave to clarify') }}"><x-icon name="flag" class="size-4" /></button>
+                            @endif
+                            @if ($canCode)
+                                <button type="button" wire:click="deleteAction({{ $a->id }})" wire:confirm="{{ __('Delete this action?') }}" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-danger-400 group-hover:opacity-100" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
+                            @endif
+                        </li>
+                    @empty
+                        <li class="px-3 py-8 text-center text-sm text-muted">{{ __('No recorded actions.') }}</li>
+                    @endforelse
+                </ul>
+                </div>
+
                 @if ($game->youtube_id)
-                    @include('livewire.games.partials.court-2d')
-                @endif
-                {{-- Quick pick: one player's (or the team's) serves, attacks from a zone... played back to back --}}
-                @if ($game->youtube_id)
+                    <div x-show="tab === 'pick'" x-cloak>
                     @php $pickPlayers = $stats->lines->filter(fn ($l) => $l->totalActions() > 0)->map(fn ($l) => $l->player)->filter()->values(); @endphp
-                    <div x-data="{ pid: null, skill: 'attack', filter: 'all', zone: null }" class="no-print space-y-2 border-t border-line px-4 py-3">
+                    <div x-data="{ pid: null, skill: 'attack', filter: 'all', zone: null }" class="no-print space-y-2 p-3">
                         <div class="flex flex-wrap items-center gap-1.5">
                             <span class="label !mb-0 mr-1">{{ __('Quick pick') }}</span>
                             <button type="button" x-on:click="pid = null" :class="pid === null ? 'bg-brand-500 text-white' : 'bg-surface-2 hover:bg-surface-3'" class="rounded-lg px-2 py-1 text-xs font-semibold">{{ __('Team') }}</button>
@@ -111,14 +167,13 @@
                         </div>
                         <x-ui.button size="sm" icon="play" x-on:click="playStat(pid, skill, filter, zone)">{{ __('Play these actions') }}</x-ui.button>
                     </div>
+                    </div>
                 @endif
-            </div>
-        </div>
 
-        {{-- Side panel: coding (staff) + timeline --}}
-        <div class="space-y-6 xl:col-span-4">
-            @if ($canCode)
-                <x-ui.card title="{{ __('Manual coding') }}" subtitle="{{ __('Correct or complete the AI analysis. Time is taken from the player.') }}" padding="p-4">
+                @if ($canCode)
+                    {{-- x-show (not x-if): the keyboard shortcuts keep working while another tab is open --}}
+                    <div x-show="tab === 'coding'" x-cloak class="p-4">
+                        <p class="mb-3 text-xs text-muted">{{ __('Correct or complete the AI analysis. Time is taken from the player.') }}</p>
                     @php $numbers = $roster->whereNotNull('number')->mapWithKeys(fn ($p) => [$p->number => $p->id]); @endphp
                     <div x-data="coder(@js((object) $numbers->all()))" x-on:keydown.window="onKey($event)" class="space-y-4">
                         <div class="flex items-center gap-2 text-sm">
@@ -199,12 +254,13 @@
                             </ul>
                         </details>
                     </div>
-                </x-ui.card>
-            @endif
+                    </div>
+                @endif
 
-            @if ($canCode && $reviewCount > 0)
-                <x-ui.card title="{{ __('To clarify') }} ({{ $reviewCount }})" subtitle="{{ __('The AI was not sure about these. Watch, pick the player or grade, confirm.') }}" padding="p-2">
-                    <ul class="max-h-[24rem] divide-y divide-line overflow-y-auto">
+                @if ($canCode && $reviewCount > 0)
+                    <div x-show="tab === 'review'" x-cloak class="p-2">
+                        <p class="px-3 pb-1 pt-1 text-xs text-muted">{{ __('The AI was not sure about these. Watch, pick the player or grade, confirm.') }}</p>
+                    <ul class="divide-y divide-line">
                         @foreach ($review as $a)
                             <li wire:key="rv-{{ $a->id }}" x-data="{ pid: @js($a->player_id), grade: @js($a->grade->value) }" class="space-y-2 rounded-xl px-3 py-2.5">
                                 <div class="flex items-center gap-2">
@@ -233,39 +289,18 @@
                             </li>
                         @endforeach
                     </ul>
-                </x-ui.card>
-            @endif
+                    </div>
+                @endif
+            </div>
+        </section>
 
-            <x-ui.card title="{{ __('Timeline') }}" subtitle="{{ __('Click to jump in the video.') }}" padding="p-2">
-                <ul class="max-h-[28rem] divide-y divide-line overflow-y-auto">
-                    @forelse ($timeline as $a)
-                        <li wire:key="a-{{ $a->id }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 transition hover:bg-surface-2 {{ $loop->first ? 'animate-flash' : '' }}">
-                            <button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-left" @if ($a->video_time !== null) x-on:click="jump({{ $a->video_time }})" @endif>
-                                <span class="w-12 shrink-0 text-xs tabular text-muted">{{ \App\Support\YouTube::formatTime($a->video_time) }}</span>
-                                <span class="grid size-7 shrink-0 place-items-center rounded-lg text-sm font-bold {{ $gradeStyles[$a->grade->value] }}">{{ $a->grade->value }}</span>
-                                <span class="flex min-w-0 items-center gap-1.5 truncate text-sm"><x-jersey :player="$a->player" /> <span class="text-muted">·</span> {{ $a->skill->label() }}@if ($a->zone_from || $a->zone_to)<span class="text-xs text-subtle">{{ $a->zone_from }}{{ $a->zone_from && $a->zone_to ? '→' : '' }}{{ $a->zone_to }}</span>@endif</span>
-                            </button>
-                            @if ($a->needs_review)
-                                <span class="text-warning-400" title="{{ __('To clarify') }}: {{ $a->reviewReason() }}"><x-icon name="flag" class="size-4" /></span>
-                            @endif
-                            @if ($a->source === \App\Enums\ActionSource::Ai)
-                                <x-ui.badge tone="accent" title="{{ __('Confidence') }} {{ $a->confidence !== null ? round($a->confidence * 100).'%' : '–' }}">AI</x-ui.badge>
-                            @endif
-                            @if ($a->set)<span class="text-xs text-subtle">S{{ $a->set->number }}</span>@endif
-                            @if ($canCode && ! $a->needs_review)
-                                <button type="button" wire:click="flagAction({{ $a->id }})" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-warning-400 group-hover:opacity-100" title="{{ __('Leave to clarify') }}" aria-label="{{ __('Leave to clarify') }}"><x-icon name="flag" class="size-4" /></button>
-                            @endif
-                            @if ($canCode)
-                                <button type="button" wire:click="deleteAction({{ $a->id }})" wire:confirm="{{ __('Delete this action?') }}" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-danger-400 group-hover:opacity-100" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
-                            @endif
-                        </li>
-                    @empty
-                        <li class="px-3 py-8 text-center text-sm text-muted">{{ __('No recorded actions.') }}</li>
-                    @endforelse
-                </ul>
-            </x-ui.card>
-        </div>
+        @if ($game->youtube_id)
+            <div class="card overflow-hidden xl:col-span-7 xl:row-start-2 2xl:col-span-8">
+                @include('livewire.games.partials.court-2d')
+            </div>
+        @endif
     </div>
+
 
     {{-- Box score --}}
     <x-ui.card class="mt-6" title="{{ __('Player stats') }}" subtitle="{{ __('Click a number to watch those actions on video.') }}" padding="p-0 sm:p-0">

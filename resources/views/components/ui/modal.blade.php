@@ -1,8 +1,12 @@
 @props(['name', 'title' => null, 'maxWidth' => 'max-w-lg'])
-{{-- Open with $dispatch('open-modal', '{{ $name }}') / close with 'close-modal'. --}}
-<div x-data="{ open: false }"
-     x-on:open-modal.window="if ($event.detail === @js($name)) open = true"
-     x-on:close-modal.window="if ($event.detail === @js($name) || ! $event.detail) open = false"
+{{--
+    Open with $dispatch('open-modal', '{{ $name }}') / close with 'close-modal'.
+    From PHP, Livewire's $this->dispatch('open-modal', 'name') sends the name wrapped in an array
+    (detail = ['name']), so both shapes are accepted.
+--}}
+<div x-data="{ open: false, target(d) { d = Array.isArray(d) ? d[0] : d; return d?.name ?? d ?? null } }"
+     x-on:open-modal.window="if (target($event.detail) === @js($name)) open = true"
+     x-on:close-modal.window="if (target($event.detail) === @js($name) || ! target($event.detail)) open = false"
      x-on:keydown.escape.window="open = false"
      x-show="open" x-cloak
      class="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">

@@ -18,4 +18,17 @@ if (import.meta.env.VITE_REVERB_APP_KEY) {
         forceTLS: scheme === 'https',
         enabledTransports: ['ws', 'wss'],
     });
+
+    // No Reverb server at all (typical locally, without `php artisan reverb:start`): stop retrying
+    // after the first failed round instead of filling the console; the app works without live updates.
+    // Once it has connected, a later outage keeps the normal reconnecting.
+    const pusher = window.Echo.connector?.pusher;
+    let everConnected = false;
+    pusher?.connection.bind('state_change', ({ current }) => {
+        everConnected ||= current === 'connected';
+
+        if (!everConnected && (current === 'unavailable' || current === 'failed')) {
+            pusher.disconnect();
+        }
+    });
 }
