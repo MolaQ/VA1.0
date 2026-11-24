@@ -39,7 +39,7 @@ Raz, w terminalu (PowerShell):
    .venv\Scripts\Activate.ps1
    python -m pip install --upgrade pip
    python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-   python -m pip install -e ".[vision,server,dev]"
+   python -m pip install -e ".[vision,tracking,server,dev]"
    python -c "import torch; print(torch.cuda.is_available())"
    ```
    Po aktywacji linia terminala zaczyna się od `(.venv)`; wszystkie dalsze polecenia wpisuj tylko w takim terminalu.
@@ -101,8 +101,40 @@ Ten sam przebieg YOLO, który szuka piłki, zwraca też ludzi (klasa COCO „per
 nic nie kosztują czasowo. Dla każdej osoby punkt stóp (środek dolnej krawędzi ramki) jest
 przeliczany homografią z kalibracji boiska na metry (x 0..9 w poprzek, y 0..18 wzdłuż,
 0 = linia końcowa bliżej kamery, 9 = siatka). Osoby daleko poza boiskiem (ławka, sędziowie,
-widzowie) są odrzucane, a prosty tracker nadaje każdemu zawodnikowi stały identyfikator
-śladu. Kierunek ciała (trójkącik przy kropce) to kierunek ruchu; stojący zawodnik „patrzy”
+widzowie) są odrzucane, a każdy zawodnik dostaje stały identyfikator śladu.
+
+**Śledzenie BoT-SORT + re-ID (pakiet `boxmot`, dodatek `[tracking]`).** Gdy jest zainstalowany,
+tracker BoT-SORT działa na każdej analizowanej klatce (12/s): filtr Kalmana przewiduje ruch,
+kompensuje ruch kamery i porównuje wygląd ramek małą siecią re-ID (OSNet x0.25). Zawodnicy
+mijający się pod siatką nie zamieniają się już śladami, a ślad przetrwa ok. 3 s zasłonięcia.
+Bez `boxmot` działa prosty tracker łączący kropki po odległości (`Settings.tracker = "simple"`
+wymusza go). Ta sama sieć daje „odcisk” zawodnika (wektor 512 liczb): ślady ze znanym numerem
+(OCR, rotacja, poprawka analityka) uczą odcisku numeru, a ślady bez numeru dostają głos na
+najbliższy odcisk, gdy jest wyraźnie bliższy od drugiego. Odciski są pamiętane per drużyna w
+`work/reid-team<id>.json`, więc każdy mecz i każda poprawka poprawia rozpoznawanie.
+Odciski i identyfikatory BoT-SORT trafiają do `*.detections.json`; dla starszych plików uruchom z `--fresh`.
+
+**Kierunek ciała z barków (YOLO-pose).** Raz na sekundę model `yolo11s-pose` znajduje barki
+każdego zawodnika. Linia barków przeniesiona na wysokość stóp i zrzutowana na parkiet daje
+kierunek, w którą stronę jest zwrócony tułów, także gdy zawodnik stoi albo przesuwa się bokiem.
+Gdy barki są niewidoczne lub ustawione dokładnie bokiem do kamery, zostaje kierunek ruchu
+(`Settings.pose = False` wyłącza pozy).
+
+**Własny model naszych zawodników (`train-players`).** Co 6 s program wycina z obrazu każdego
+zawodnika na boisku (`work/crops/<film>/`). Po analizie wycinki śladów ze znanym numerem
+(poprawka analityka, rotacja, OCR; nie zgadywanie z wyglądu, żeby model nie uczył się
+własnych pomyłek) trafiają do `work/dataset-team<id>/<numer>/`, a `manifest.csv` mówi, czy
+numer potwierdził człowiek (`analyst`), czy AI (`auto`). Ponowna analiza tego samego meczu po
+poprawkach podmienia jego wycinki. Gdy zbierze się materiał (najlepiej 2-3 mecze), uruchom:
+
+```powershell
+python -m vva_analyzer train-players --team 5
+```
+
+Uczy się mały klasyfikator YOLO (`yolo11n-cls`, kilka minut na RTX 3060) rozpoznający naszych
+zawodników po wszystkim naraz: twarzy, włosach, sylwetce, butach i numerze. Zapisuje
+`work/players-team<id>.pt`; kolejne analizy dają nim głos śladom bez numeru. Wszystko działa
+lokalnie i za darmo; im więcej poprawek w widoku 2D, tym lepszy model po następnym treningu. Kierunek ciała (trójkącik przy kropce) to kierunek ruchu; stojący zawodnik „patrzy”
 na siatkę. Drużyna wynika z połowy boiska i seta (strony zmieniają się co set).
 
 Co 0,5 s powstaje klatka pozycji, wysyłana na końcu analizy do `POST /api/v1/games/{id}/frames`.

@@ -14,6 +14,16 @@
 <div wire:ignore x-data="court2d(@js(['sets' => $courtSets, 'canCode' => $canCode]))" class="no-print border-t border-line px-4 py-3">
     <div class="mb-2 flex flex-wrap items-center gap-2">
         <span class="label !mb-0">{{ __('Court view') }}</span>
+        <div class="flex gap-0.5 rounded-lg bg-surface-2 p-0.5 text-xs font-semibold">
+            <button type="button" x-on:click="setMode('rotation')" :class="mode === 'rotation' ? 'bg-surface-3 text-fg shadow' : 'text-muted hover:text-fg'" class="rounded-md px-2 py-1">{{ __('Rotation') }}</button>
+            <button type="button" x-on:click="setMode('live')" :class="mode === 'live' ? 'bg-surface-3 text-fg shadow' : 'text-muted hover:text-fg'" class="rounded-md px-2 py-1">{{ __('Live (beta)') }}</button>
+        </div>
+        <span class="text-xs text-muted" x-show="status() === 'rotation'">
+            Set <b x-text="rotInfo().set"></b> · {{ __('Rotation') }} <b x-text="rotInfo().rot"></b> (I: #<span x-text="rotInfo().zone1"></span>) ·
+            <b class="tabular" x-text="rotInfo().us + ':' + rotInfo().them"></b> ·
+            <span x-text="rotInfo().serve === 'us' ? @js(__('we serve')) : (rotInfo().serve === 'them' ? @js(__('we receive')) : '')"></span>
+        </span>
+        <span class="text-xs text-muted" x-show="status() === 'no-rotation'">{{ __('No rotation yet: enter the starting lineup of the set below.') }}</span>
         <span class="text-xs text-muted" x-show="status() === 'none'">{{ __('No player positions for this moment yet.') }}</span>
         <span class="text-xs text-muted" x-show="status() === 'ai'">{{ __('Positions from the AI analysis.') }}</span>
         <div class="ml-auto flex items-center gap-1.5">
@@ -52,7 +62,7 @@
 
     @if ($canCode)
         {{-- AI lost the number or is unsure: name the dot (the whole track gets it) --}}
-        <div x-show="selected" x-cloak x-transition class="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">
+        <div x-show="selected && mode === 'live'" x-cloak x-transition class="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">
             <span class="text-muted">{{ __('Who is this?') }}</span>
             <input type="number" min="0" max="99" :value="selected?.n ?? ''" x-on:input="selected.n = $event.target.value" x-on:keydown.enter.prevent="saveLabel()" class="input !w-20 !px-2 !py-1 tabular" placeholder="#" aria-label="{{ __('Jersey number') }}">
             <button type="button" x-on:click="selected.team = 'us'" :class="selected?.team === 'us' ? 'bg-brand-500 text-white' : 'bg-surface-3'" class="rounded-lg px-2 py-1 text-xs font-semibold">{{ __('Us') }}</button>

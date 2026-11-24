@@ -66,6 +66,12 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument("--count", type=int, default=40)
     f.add_argument("--workdir", default="work")
 
+    tp = sub.add_parser("train-players", help="teach the player model on the labelled crops of earlier matches")
+    tp.add_argument("--team", type=int, help="VVA team id (dataset-team<id>); default: the agent's work folder, any team")
+    tp.add_argument("--workdir", help="default: the agent's work folder")
+    tp.add_argument("--epochs", type=int, default=30)
+    tp.add_argument("--device")
+
     g = sub.add_parser("agent", help="take queued matches from VVA and analyse them (no window)")
     g.add_argument("--server", help="VVA address, e.g. http://localhost/molak/VVA/public (saved for next time)")
     g.add_argument("--token", default=os.environ.get("VVA_API_TOKEN"), help="club API token (saved for next time)")
@@ -82,8 +88,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
-    workdir = Path(getattr(args, "workdir", "work"))
-    if hasattr(args, "workdir"):
+    workdir = Path(getattr(args, "workdir", None) or "work")
+    if getattr(args, "workdir", None):
         workdir.mkdir(parents=True, exist_ok=True)
 
     if args.cmd == "calibrate":
@@ -164,6 +170,20 @@ def main(argv: list[str] | None = None) -> int:
                     y0, y1 = int(max(0, (first.y - 0.05) * h)), int(min(h, (first.y + 0.25) * h))
                     cv2.imwrite(str(out / f"{name}_crop.png"), frame[y0:y1, x0:x1])
         print(f"Zapisano {len(ours)} zagrywek do {out} (klatka 1 s przed i w chwili zagrywki, plus wycinek wokol pilki).")
+        return 0
+
+    if args.cmd == "train-players":
+        from . import dataset
+        from .agent import AgentConfig
+        work = Path(args.workdir) if args.workdir else AgentConfig.load().work_path
+        name = f"dataset-team{args.team}" if args.team else "dataset"
+        data = work / name
+        if not data.exists():
+            found = sorted(work.glob("dataset*"))
+            raise SystemExit(f"Brak {data}. Znalezione: {', '.join(x.name for x in found) or 'nic'}")
+        out = work / (f"players-team{args.team}.pt" if args.team else "players.pt")
+        counts = dataset.train(data, out, args.epochs, _device(args.device))
+        print(f"Model zawodników: {out} ({len(counts)} numerów, {sum(counts.values())} wycinków)")
         return 0
 
     if args.cmd == "agent":

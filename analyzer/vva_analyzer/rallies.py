@@ -56,6 +56,7 @@ class Rally:
     crossings: int | None = None
     serve_grade: str | None = None  # VVA grade of the serve: # ! =
     server_number: int | None = None  # jersey number of our server (from the starting rotation)
+    rotation: int | None = None  # our side-outs so far in the set (0 = starting lineup), known with a lineup
     confidence: float = 0.5
     # No play matched (start is None): the rally happened between the previous scoreboard
     # update and this one, so the previous update is where to start looking in the video.
@@ -236,6 +237,8 @@ def assign_servers(rallies: list[Rally], lineups: dict[int, list[int | None]]) -
         if r.server == "us" and p is not None and p.server == "them":
             k = rot[r.set] = k + 1
         prev[r.set] = r
+        if lineup and len(lineup) == 6:
+            r.rotation = k
         if r.server == "us" and lineup and len(lineup) == 6 and lineup[k % 6] is not None:
             r.server_number = lineup[k % 6]
             done += 1

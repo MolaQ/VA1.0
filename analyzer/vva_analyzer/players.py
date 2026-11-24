@@ -38,6 +38,9 @@ class Person:
     """A person box seen in the image: feet point (bottom centre) and box size, normalised 0..1.
 
     `num` / `num_conf`: jersey number read from the torso (jersey.py), when it was tried.
+    `sig`: how the player looks (appearance.py), taken now and then.
+    `tid`: the id BoT-SORT gave this box (reid.py); the tracks then follow it instead of distance.
+    `sh`: the shoulders seen by YOLO-pose (pose.py); they give the facing better than movement.
     """
 
     x: float
@@ -47,6 +50,10 @@ class Person:
     h: float = 0.0
     num: int | None = None
     num_conf: float = 0.0
+    sig: list[float] | None = None  # look: shoes + head colours (appearance.py)
+    tid: int | None = None  # BoT-SORT track id on every frame (reid.py), when it ran
+    crop: str | None = None  # file of this person's crop (dataset.py), when one was cut out
+    sh: list[float] | None = None  # shoulders from YOLO-pose: left x, y, right x, y (normalised)
 
 
 @dataclass
@@ -86,6 +93,8 @@ class Tracker:
     min_speed_facing: float = 0.8  # m/s; slower than this keeps the previous facing
     tracks: list[Track] = field(default_factory=list)
     next_id: int = 1
+    epoch: int = 0
+    by_id: dict[tuple[int, int], Track] = field(default_factory=dict)
 
     def update(self, t: float, points: list) -> list[Track]:
         """`points`: (x, y) or (x, y, person) in court metres. Returns the tracks seen now;
@@ -128,6 +137,32 @@ class Tracker:
             seen.append((tr, person(i)))
         return seen
 
+    def follow(self, t: float, points: list) -> list[tuple[Track, "Person | None"]]:
+        """Like `match`, but the people carry a BoT-SORT id: keep one track per id.
+
+        Ids are given new track numbers after `restart()` (a replay), so a player seen again
+        after a replay is not joined to the old dot by an id BoT-SORT kept through the replay."""
+        seen: list[tuple[Track, Person | None]] = []
+        for x, y, *rest in points:
+            p = rest[0] if rest else None
+            if p is None or p.tid is None:
+                continue  # BoT-SORT did not confirm this box yet
+            key = (self.epoch, p.tid)
+            tr = self.by_id.get(key)
+            if tr is None:
+                tr = Track(self.next_id, x, y, t, facing=_towards_net(y))
+                self.next_id += 1
+                self.by_id[key] = tr
+            else:
+                self._move(tr, t, x, y)
+            tr.vote(p)
+            seen.append((tr, p))
+        return seen
+
+    def restart(self) -> None:
+        self.tracks.clear()
+        self.epoch += 1
+
     def _move(self, tr: Track, t: float, x: float, y: float) -> None:
         dt = max(1e-3, t - tr.t)
         vx, vy = (x - tr.x) / dt, (y - tr.y) / dt
@@ -144,6 +179,24 @@ class Tracker:
 def heading(dx: float, dy: float) -> float:
     """Degrees, 0 = +y (towards the far end line), 90 = +x."""
     return round(math.degrees(math.atan2(dx, dy)) % 360, 0)
+
+
+def body_facing(h: np.ndarray, p: Person, min_m: float = 0.15) -> float | None:
+    """Facing from the shoulders: the shoulder line moved down to the feet and mapped onto the
+    floor; forward is the left->right shoulder vector turned 90 degrees to the left (from above).
+    None when the shoulders are too close together to tell (seen exactly from the side)."""
+    if not p.sh or len(p.sh) != 4:
+        return None
+    lx, ly, rx, ry = p.sh
+    drop = p.y - (ly + ry) / 2  # shoulders -> feet height in the picture
+    a = to_court(h, lx, ly + drop)
+    b = to_court(h, rx, ry + drop)
+    if not all(math.isfinite(v) for v in (*a, *b)):
+        return None
+    vx, vy = b[0] - a[0], b[1] - a[1]
+    if math.hypot(vx, vy) < min_m:
+        return None
+    return heading(-vy, vx)
 
 
 def _towards_net(y: float) -> float:
@@ -195,7 +248,20 @@ class Seen:
 @dataclass
 class Tracking:
     samples: list[tuple[float, list[Seen]]]
-    numbers: dict[int, int]  # track id -> jersey number agreed by the OCR reads
+    numbers: dict[int, int]  # track id -> jersey number agreed by the reads (OCR, rotations)
+    tracks: dict[int, Track] = field(default_factory=dict)
+
+    def vote(self, track: int, number: int, weight: float) -> None:
+        """An extra read for a track (e.g. from the rotation at the serve), then re-agree its number."""
+        tr = self.tracks.get(track)
+        if tr is None:
+            return
+        tr.vote(Person(0, 0, num=number, num_conf=weight))
+        n = tr.number()
+        if n is None:
+            self.numbers.pop(track, None)
+        else:
+            self.numbers[track] = n
 
     def at(self, t: float, within: float = 0.6) -> list[Seen]:
         """Players at the sample nearest to t."""
@@ -215,18 +281,27 @@ def track_players(
     out: list[tuple[float, list[Seen]]] = []
     tracks: dict[int, Track] = {}
     replays = replays or []
+    # BoT-SORT ids from the scan (reid.py) are better than joining dots by distance
+    by_id = any(p.tid is not None for _, people in samples for p in people)
+    in_replay = False
     for t, people in sorted(samples, key=lambda s: s[0]):
         if any(a <= t <= b for a, b in replays):
-            tracker.tracks.clear()  # a replay shows another camera angle: start the tracks again
+            if not in_replay:
+                tracker.restart()  # a replay shows another camera angle: start the tracks again
+            in_replay = True
             continue
+        in_replay = False
         seen = []
-        for tr, person in tracker.match(t, to_court_points(h, people)):
+        points = to_court_points(h, people)
+        for tr, person in (tracker.follow(t, points) if by_id else tracker.match(t, points)):
+            if person is not None and person.sh and (f := body_facing(h, person)) is not None:
+                tr.facing = f  # the shoulders say where the body faces, also when standing still
             tracks[tr.id] = tr
             seen.append(Seen(tr.id, round(tr.x, 2), round(tr.y, 2), tr.facing, person))
         if seen:
             out.append((t, seen))
     numbers = {k: n for k, tr in tracks.items() if (n := tr.number()) is not None}
-    return Tracking(out, numbers)
+    return Tracking(out, numbers, tracks)
 
 
 def build_frames(

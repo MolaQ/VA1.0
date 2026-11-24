@@ -3,8 +3,13 @@
  * direction the body faces), following the current video time.
  *
  * Lives inside the ytPlayer component and reads its clock (currentTime()), so seeking
- * the video moves the dots. Positions come from the analyzer (frames every ~0.5 s,
- * interpolated by track). The analyst only corrects the jersey number of a track.
+ * the video moves the dots. Two modes:
+ *  - rotation (default): our six players in their zones for the rally being played, from the
+ *    starting lineup, the side-outs and the liberos (server: RotationTimeline). Players glide
+ *    to their new zones when the rotation changes.
+ *  - live (beta): positions from the analyzer (frames every ~0.5 s, interpolated by track).
+ *    The analyst only corrects the jersey number of a track.
+ * Dots are kept per player / track and moved with a CSS transition, so they move smoothly.
  *
  * Coordinates are court metres as the camera sees the court: x 0..9 across, y 0..18 along
  * (0 = near end line, 9 = net). On screen the court lies horizontally like the zone chart:
@@ -18,6 +23,15 @@ const AI_GAP = 1.6; // AI frames further apart than this are not interpolated
 
 const round2 = (v) => Math.round(v * 100) / 100;
 
+// Base spot of each zone in a team's own frame (x as the team faces the net, y 0 = own end line).
+const ZONES = { 1: [7.5, 2.8], 2: [7.5, 7.3], 3: [4.5, 7.3], 4: [1.5, 7.3], 5: [1.5, 2.8], 6: [4.5, 2.8] };
+const SERVER_SPOT = [7.5, -1.1]; // behind the end line
+
+const storage = {
+    get(key) { try { return window.localStorage.getItem(key); } catch { return null; } },
+    set(key, value) { try { window.localStorage.setItem(key, value); } catch { /* private mode */ } },
+};
+
 export default (config) => ({
     sets: config.sets ?? [],
     canCode: !!config.canCode,
@@ -28,17 +42,40 @@ export default (config) => ({
     shownT: null,
     shownSrc: null,
     dots: [],
+    mode: storage.get('vva-court-mode') === 'live' ? 'live' : 'rotation',
+    rot: { players: {}, rallies: [] },
+    current: null, // rally entry shown in rotation mode
+    els: new Map(),
     selected: null,
     ball: { open: false, actions: [], action: null, step: null, suggested: null, zone: null },
     timer: null,
 
     init() {
         this.timer = setInterval(() => this.tick(), 150);
+        this.loadRotations();
+        this.refresh = () => this.loadRotations();
+        window.addEventListener('stats-refreshed', this.refresh);
         this.$nextTick(() => this.render());
+    },
+
+    loadRotations() {
+        this.$wire.rotations().then((res) => {
+            this.rot = res ?? { players: {}, rallies: [] };
+        }).catch(() => {});
+    },
+
+    setMode(mode) {
+        this.mode = mode;
+        this.selected = null;
+        storage.set('vva-court-mode', mode);
+        this.els.forEach((g) => g.remove());
+        this.els.clear();
+        this.tick();
     },
 
     destroy() {
         clearInterval(this.timer);
+        window.removeEventListener('stats-refreshed', this.refresh);
     },
 
     // ------------------------------------------------------------ time & data
@@ -51,12 +88,68 @@ export default (config) => ({
         }
 
         this.t = t;
+
+        if (this.mode === 'rotation') {
+            this.dots = this.rotationAt(t);
+            this.render();
+
+            return;
+        }
+
         this.ensure(t);
 
         if (!this.selected) {
             this.dots = this.positionsAt(t);
             this.render();
         }
+    },
+
+    /** Rally being played at t: the last one that started before it (or starts within 1 s). */
+    rallyAt(t) {
+        let found = null;
+        for (const r of this.rot.rallies ?? []) {
+            if (r.t <= t + 1) found = r;
+            else break;
+        }
+
+        return found;
+    },
+
+    rotationAt(t) {
+        const r = this.rallyAt(t);
+        this.current = r;
+        if (!r) return [];
+
+        const side = this.sideOfSet(r.set);
+        const facing = side === 'near' ? 0 : 180;
+
+        return Object.entries(r.zones ?? {}).map(([zone, id]) => {
+            const player = this.rot.players?.[id] ?? {};
+            const serving = Number(zone) === 1 && r.serve === 'us';
+            const [x, y] = serving ? SERVER_SPOT : ZONES[zone];
+            const c = this.teamToCamera(x, y, side);
+
+            return {
+                key: `p${id}`, team: 'us', n: player.n ?? null, libero: !!player.libero, zone: Number(zone),
+                serving, x: c.x, y: c.y, f: facing,
+            };
+        });
+    },
+
+    sideOfSet(number) {
+        return this.sets.find((s) => s.number === number)?.side ?? this.ourSide(this.t ?? 0);
+    },
+
+    teamToCamera(x, y, side) {
+        return side === 'near' ? { x, y } : { x: 9 - x, y: 18 - y };
+    },
+
+    rotInfo() {
+        const r = this.current;
+        if (!r) return '';
+        const zone1 = this.rot.players?.[r.zones?.[1]]?.n;
+
+        return { set: r.set, rot: r.rot, us: r.us, them: r.them, serve: r.serve, zone1: zone1 ?? '?' };
     },
 
     ensure(t) {
@@ -175,29 +268,42 @@ export default (config) => ({
     render() {
         const layer = this.$refs.dots;
         if (!layer) return;
-        layer.replaceChildren();
 
-        this.dots.forEach((p, i) => layer.appendChild(this.dot(p, i)));
+        const seen = new Set();
+        this.dots.forEach((p, i) => {
+            const key = p.key ?? (p.k !== null && p.k !== undefined ? `k${p.k}` : `i${i}`);
+            seen.add(key);
+            let g = this.els.get(key);
+            if (!g) {
+                g = this.dot(p);
+                g.style.transform = `translate(${p.y}px, ${p.x}px)`;
+                layer.appendChild(g);
+                this.els.set(key, g);
+            }
+            this.update(g, p, i);
+        });
+
+        this.els.forEach((g, key) => {
+            if (!seen.has(key)) {
+                g.remove();
+                this.els.delete(key);
+            }
+        });
 
         this.renderBall();
     },
 
-    dot(p, i) {
+    dot(p) {
         const g = document.createElementNS(SVG, 'g');
-        g.setAttribute('transform', `translate(${p.y} ${p.x})`);
-        g.dataset.index = i;
-        g.classList.add('court-dot', p.team === 'them' ? 'court-dot-them' : 'court-dot-us');
-        if (p.n === null || p.n === undefined) g.classList.add('court-dot-unknown');
-        if (this.canCode && p.k !== null && p.k !== undefined) g.classList.add('cursor-pointer');
-        if (this.selected && this.selected.k === p.k) g.classList.add('court-dot-selected');
+        g.classList.add('court-dot', this.mode === 'rotation' ? 'court-dot-glide' : 'court-dot-live');
 
-        if (p.f !== null && p.f !== undefined) {
-            const tri = document.createElementNS(SVG, 'polygon');
-            tri.setAttribute('points', '0.42,-0.17 0.7,0 0.42,0.17');
-            tri.setAttribute('transform', `rotate(${p.f})`);
-            tri.classList.add('court-dot-facing');
-            g.appendChild(tri);
-        }
+        const facing = document.createElementNS(SVG, 'g');
+        facing.classList.add('court-dot-turn');
+        const tri = document.createElementNS(SVG, 'polygon');
+        tri.setAttribute('points', '0.42,-0.17 0.7,0 0.42,0.17');
+        tri.classList.add('court-dot-facing');
+        facing.appendChild(tri);
+        g.appendChild(facing);
 
         const c = document.createElementNS(SVG, 'circle');
         c.setAttribute('r', '0.38');
@@ -209,10 +315,35 @@ export default (config) => ({
         text.setAttribute('dominant-baseline', 'central');
         text.setAttribute('font-size', '0.38');
         text.classList.add('court-dot-label');
-        text.textContent = p.n ?? '?';
         g.appendChild(text);
 
         return g;
+    },
+
+    update(g, p, i) {
+        g.dataset.index = i;
+        g.style.transform = `translate(${p.y}px, ${p.x}px)`;
+        g.classList.toggle('court-dot-us', p.team !== 'them');
+        g.classList.toggle('court-dot-them', p.team === 'them');
+        g.classList.toggle('court-dot-libero', !!p.libero);
+        g.classList.toggle('court-dot-serving', !!p.serving);
+        g.classList.toggle('court-dot-unknown', p.n === null || p.n === undefined);
+        g.classList.toggle('cursor-pointer', this.mode === 'live' && this.canCode && p.k !== null && p.k !== undefined);
+        g.classList.toggle('court-dot-selected', !!(this.selected && this.selected.k === p.k));
+
+        const turn = g.querySelector('.court-dot-turn');
+        turn.style.display = p.f === null || p.f === undefined ? 'none' : '';
+        if (p.f !== null && p.f !== undefined) {
+            // turn the shortest way round
+            const prev = Number(turn.dataset.f ?? p.f);
+            const next = prev + ((((p.f - prev) % 360) + 540) % 360) - 180;
+            turn.dataset.f = next;
+            turn.style.transform = `rotate(${next}deg)`;
+        }
+
+        const text = g.querySelector('text');
+        const label = p.n ?? '?';
+        if (text.textContent !== String(label)) text.textContent = label;
     },
 
     renderBall() {
@@ -270,7 +401,7 @@ export default (config) => ({
         }
 
         const g = evt.target.closest?.('.court-dot');
-        if (!this.canCode || !g) {
+        if (!this.canCode || !g || this.mode !== 'live') {
             this.selected = null;
             this.render();
 
@@ -350,6 +481,7 @@ export default (config) => ({
 
     status() {
         if (this.t === null) return '';
+        if (this.mode === 'rotation') return this.current ? 'rotation' : 'no-rotation';
 
         return this.shownSrc === null ? 'none' : 'ai';
     },

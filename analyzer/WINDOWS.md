@@ -41,7 +41,7 @@ w ustawieniach zaznaczysz „Zachowuj pobrane nagrania”).
 
 ```
 cd analyzer
-python -m pip install -e ".[vision,tray]"
+python -m pip install -e ".[vision,tray,tracking]"
 python -m vva_analyzer tray      # ikona w zasobniku
 python -m vva_analyzer agent --server http://localhost/molak/VVA/public --token "1|..."   # bez okna
 ```
