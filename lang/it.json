@@ -539,5 +539,21 @@
     "Player deleted.": "Giocatore eliminato.",
     "The player has actions in matches, so they were marked inactive instead of deleted.": "Il giocatore ha azioni nelle partite, quindi è stato segnato come inattivo invece di essere eliminato.",
     "Delete player? If they already have actions in matches, they will only be marked inactive.": "Eliminare il giocatore? Se ha già azioni nelle partite, verrà solo segnato come inattivo.",
-    "Delete team? Its players stay in the club without a team.": "Eliminare la squadra? I suoi giocatori restano nel club senza squadra."
+    "Delete team? Its players stay in the club without a team.": "Eliminare la squadra? I suoi giocatori restano nel club senza squadra.",
+    "Reports": "Report",
+    "Match comparison": "Confronto partite",
+    "Pick up to 10 matches: the same numbers side by side, the total and the trend of the latest match.": "Scegli fino a 10 partite: gli stessi numeri affiancati, il totale e il trend dell'ultima partita.",
+    "selected": "selezionate",
+    "Pick matches to compare": "Scegli le partite da confrontare",
+    "Choose at least one match above.": "Scegli almeno una partita qui sopra.",
+    "Team match by match": "Squadra partita per partita",
+    "Total = computed from all actions of the chosen matches. Trend = latest match against the average of the others.": "Totale = calcolato da tutte le azioni delle partite scelte. Trend = ultima partita rispetto alla media delle altre.",
+    "Latest match against the average of the others": "Ultima partita rispetto alla media delle altre",
+    "Trend": "Trend",
+    "Players match by match": "Giocatori partita per partita",
+    "Usefulness per set in each match, and the totals over the chosen matches.": "Utilità a set in ogni partita e totali delle partite scelte.",
+    "Value per set": "Valore a set",
+    "match": "partita",
+    "Compare matches": "Confronta partite",
+    "Metric": "Indicatore"
 }
