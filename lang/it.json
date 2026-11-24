@@ -534,5 +534,10 @@
     "No YouTube link: the agent cannot take this match.": "Nessun link YouTube: l'agente non può prendere questa partita.",
     "The analysis is still running or was interrupted. Put the match back in the queue?": "L'analisi è in corso o è stata interrotta. Rimettere la partita in coda?",
     "Analyse again": "Analizza di nuovo",
-    "Back to the queue": "Rimetti in coda"
+    "Back to the queue": "Rimetti in coda",
+    "This number is already taken in this team.": "Questo numero è già assegnato in questa squadra.",
+    "Player deleted.": "Giocatore eliminato.",
+    "The player has actions in matches, so they were marked inactive instead of deleted.": "Il giocatore ha azioni nelle partite, quindi è stato segnato come inattivo invece di essere eliminato.",
+    "Delete player? If they already have actions in matches, they will only be marked inactive.": "Eliminare il giocatore? Se ha già azioni nelle partite, verrà solo segnato come inattivo.",
+    "Delete team? Its players stay in the club without a team.": "Eliminare la squadra? I suoi giocatori restano nel club senza squadra."
 }

@@ -6,6 +6,15 @@
         </x-slot:actions>
     </x-ui.page-header>
 
+    @if ($teams->count() > 1)
+        <div class="mb-4 flex flex-wrap gap-2" role="group" aria-label="{{ __('Team') }}">
+            <button type="button" wire:click="$set('teamFilter', null)" @class(['rounded-full border px-3 py-1 text-sm transition', 'border-brand-500 bg-brand-500/15 text-fg' => ! $teamFilter, 'border-line text-muted hover:text-fg' => $teamFilter])>{{ __('All teams') }}</button>
+            @foreach ($teams as $t)
+                <button type="button" wire:key="tf-{{ $t->id }}" wire:click="$set('teamFilter', {{ $t->id }})" @class(['rounded-full border px-3 py-1 text-sm transition', 'border-brand-500 bg-brand-500/15 text-fg' => $teamFilter === $t->id, 'border-line text-muted hover:text-fg' => $teamFilter !== $t->id])>{{ $t->name }}</button>
+            @endforeach
+        </div>
+    @endif
+
     @forelse ($groups as $team => $players)
         <h2 class="mb-3 mt-6 flex items-center gap-2 font-display text-xl font-semibold first:mt-0">{{ $team }} <x-ui.badge>{{ $players->count() }}</x-ui.badge></h2>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -57,7 +66,10 @@
                 </x-ui.field>
                 <x-ui.field label="{{ __('Date of birth') }}" for="birth_date" error="birth_date"><input id="birth_date" type="date" wire:model="birth_date" class="input"></x-ui.field>
                 <label class="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" wire:model="is_active" class="size-4 accent-brand-500"> {{ __('Active in the roster') }}</label>
-                <div class="flex justify-end gap-2 sm:col-span-2">
+                <div class="flex items-center justify-end gap-2 sm:col-span-2">
+                    @if ($canDelete)
+                        <x-ui.button variant="ghost" icon="trash" class="mr-auto text-danger-400" wire:click="delete({{ $editingId }})" wire:confirm="{{ __('Delete player? If they already have actions in matches, they will only be marked inactive.') }}">{{ __('Delete') }}</x-ui.button>
+                    @endif
                     <x-ui.button variant="ghost" x-on:click="$dispatch('close-modal', 'player-form')">{{ __('Cancel') }}</x-ui.button>
                     <x-ui.button type="submit" icon="check">{{ __('Save') }}</x-ui.button>
                 </div>

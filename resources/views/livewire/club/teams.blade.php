@@ -24,12 +24,13 @@
                         </div>
                         <div class="flex gap-1">
                             <button wire:click="edit({{ $team->id }})" class="rounded-lg p-1.5 text-subtle hover:bg-surface-2 hover:text-fg" aria-label="{{ __('Edit') }}"><x-icon name="pencil" class="size-4" /></button>
-                            <button wire:click="delete({{ $team->id }})" wire:confirm="{{ __('Delete team?') }}" class="rounded-lg p-1.5 text-subtle hover:bg-surface-2 hover:text-danger-400" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
+                            <button wire:click="delete({{ $team->id }})" wire:confirm="{{ __('Delete team? Its players stay in the club without a team.') }}" class="rounded-lg p-1.5 text-subtle hover:bg-surface-2 hover:text-danger-400" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
                         </div>
                     </div>
-                    <div class="mt-4 flex gap-2">
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
                         <x-ui.badge tone="brand">{{ __(':count players', ['count' => $team->players_count]) }}</x-ui.badge>
                         <x-ui.badge tone="energy">{{ __(':count matches', ['count' => $team->games_count]) }}</x-ui.badge>
+                        <a href="{{ route('players.index', ['team' => $team->id]) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-sm font-medium text-brand-400 hover:text-brand-300"><x-icon name="users" class="size-4" /> {{ __('Roster') }}</a>
                     </div>
                 </div>
             @endforeach
