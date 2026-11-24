@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Events\GameActionsRecorded;
 use App\Events\GameAnalysisUpdated;
 use App\Jobs\RequestVideoAnalysis;
+use App\Livewire\Club\Integrations;
 use App\Livewire\Games\GameShow;
 use App\Models\Club;
 use App\Models\SetLineup;
@@ -200,4 +201,22 @@ it('queues matches for the agent when no analyzer url is configured', function (
     (new RequestVideoAnalysis($game))->handle();
 
     expect($game->fresh()->analysis_status)->toBe(AnalysisStatus::Queued);
+});
+
+it('shows running analyses with an estimate on the integrations page', function () {
+    ['club' => $club, 'game' => $game] = clubWithGame();
+    $game->forceFill([
+        'analysis_status' => AnalysisStatus::Processing,
+        'analysis_progress' => 25,
+        'analysis_message' => 'Analiza obrazu: 30 z 120 min',
+        'analysis_started_at' => now()->subMinutes(10),
+        'analysis_updated_at' => now(),
+    ])->save();
+
+    expect($game->fresh()->analysisSecondsLeft())->toBeBetween(1790, 1810);
+
+    Livewire\Livewire::actingAs(member($club, Role::Admin))
+        ->test(Integrations::class)
+        ->assertSee('Analiza obrazu: 30 z 120 min')
+        ->assertSee('25%');
 });

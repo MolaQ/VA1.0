@@ -30,11 +30,12 @@ use Illuminate\Support\Carbon;
  * @property int $analysis_progress
  * @property string|null $analysis_message
  * @property Carbon|null $analysis_updated_at
+ * @property Carbon|null $analysis_started_at
  * @property-read Team $team
  */
 #[Fillable([
     'club_id', 'team_id', 'opponent', 'played_at', 'venue', 'is_home', 'youtube_url', 'youtube_id',
-    'sets_won', 'sets_lost', 'analysis_status', 'analysis_progress', 'analysis_message', 'analysis_updated_at',
+    'sets_won', 'sets_lost', 'analysis_status', 'analysis_progress', 'analysis_message', 'analysis_updated_at', 'analysis_started_at',
 ])]
 class Game extends Model
 {
@@ -50,6 +51,7 @@ class Game extends Model
             'is_home' => 'boolean',
             'analysis_status' => AnalysisStatus::class,
             'analysis_updated_at' => 'datetime',
+            'analysis_started_at' => 'datetime',
         ];
     }
 
@@ -110,6 +112,20 @@ class Game extends Model
     public function tracks(): HasMany
     {
         return $this->hasMany(GameTrack::class);
+    }
+
+    /**
+     * Estimated seconds left of a running analysis, from the pace so far (null until 5%).
+     */
+    public function analysisSecondsLeft(): ?int
+    {
+        if ($this->analysis_status !== AnalysisStatus::Processing || $this->analysis_started_at === null
+            || $this->analysis_progress < 5 || $this->analysis_progress >= 100) {
+            return null;
+        }
+        $elapsed = max(1, (int) $this->analysis_started_at->diffInSeconds(now()));
+
+        return (int) round($elapsed * (100 - $this->analysis_progress) / $this->analysis_progress);
     }
 
     public function title(): string

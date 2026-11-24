@@ -46,6 +46,7 @@ class AgentController extends Controller
                 'analysis_progress' => 0,
                 'analysis_message' => __('The analysis agent has taken the match.'),
                 'analysis_updated_at' => now(),
+                'analysis_started_at' => now(),
             ])->save();
 
             return $game;

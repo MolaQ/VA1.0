@@ -58,6 +58,12 @@ class Integrations extends Component
             'tokens' => $this->user()->tokens()->latest()->get(),
             'agentOnline' => $agentSeen !== null && Carbon::parse($agentSeen)->gt(now()->subMinutes(2)),
             'agentSeen' => $agentSeen !== null ? Carbon::parse($agentSeen) : null,
+            'jobs' => Game::query()->with('team')->where('club_id', $clubId)
+                ->where(fn ($q) => $q->whereIn('analysis_status', ['queued', 'processing'])
+                    ->orWhere(fn ($q) => $q->whereIn('analysis_status', ['completed', 'failed'])
+                        ->where('analysis_updated_at', '>', now()->subDays(2))))
+                ->orderByRaw("case analysis_status when 'processing' then 0 when 'queued' then 1 else 2 end")
+                ->orderByDesc('analysis_updated_at')->limit(10)->get(),
             'queued' => Game::query()->where('club_id', $clubId)->whereIn('analysis_status', ['queued', 'processing'])->count(),
             'apiBase' => url('/api/v1'),
             'analyzerConfigured' => filled(config('services.analyzer.url')),

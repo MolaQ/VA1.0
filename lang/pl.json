@@ -522,5 +522,11 @@
     "Click where the serve landed or was received.": "Kliknij, gdzie zagrywka spadła lub została przyjęta.",
     "Saved.": "Zapisano.",
     "Suggested reception grade": "Sugerowana ocena przyjęcia",
-    "Apply": "Zastosuj"
+    "Apply": "Zastosuj",
+    "Analyses": "Analizy",
+    "Refreshes every few seconds.": "Odświeża się co kilka sekund.",
+    "About :time left": "Zostało ok. :time",
+    "started :time": "start :time",
+    "updated :time": "aktualizacja :time",
+    "No analyses yet.": "Jeszcze nie było analiz."
 }

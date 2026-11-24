@@ -209,7 +209,8 @@ class TrayApp:
         if self.icon is None:
             return
         self.icon.icon = icon_image(st.status)
-        self.icon.title = f"VVA Analyzer: {st.message}"[:127]
+        pct = f"{st.progress}% · " if st.status == "working" and st.progress else ""
+        self.icon.title = f"VVA Analyzer: {pct}{st.message}"[:127]
         self.icon.update_menu()
 
     # menu actions -------------------------------------------------
@@ -332,7 +333,8 @@ class TrayApp:
 
         item = pystray.MenuItem
         menu = pystray.Menu(
-            item(lambda _: self.agent.state.message[:80], None, enabled=False),
+            item(lambda _: (f"{self.agent.state.progress}% · " if self.agent.state.status == "working" else "")
+                 + self.agent.state.message[:80], None, enabled=False),
             item(lambda _: self.gpu[:80], None, enabled=False),
             pystray.Menu.SEPARATOR,
             item("Otwórz VVA", self.open_site, default=True),

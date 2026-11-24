@@ -22,6 +22,43 @@
                 <p class="mt-3 text-xs text-muted">{{ __('Matches waiting or in analysis: :count', ['count' => $queued]) }}</p>
             </x-ui.card>
 
+            <x-ui.card title="{{ __('Analyses') }}" subtitle="{{ __('Refreshes every few seconds.') }}" padding="p-0">
+                <ul class="divide-y divide-line" wire:poll.5s.visible>
+                    @forelse ($jobs as $job)
+                        @php
+                            $st = $job->analysis_status;
+                            $left = $job->analysisSecondsLeft();
+                        @endphp
+                        <li class="px-5 py-3 text-sm" wire:key="job-{{ $job->id }}">
+                            <div class="flex items-center gap-2">
+                                <a href="{{ route('games.show', $job) }}" wire:navigate class="min-w-0 flex-1 truncate font-semibold hover:text-brand-400">{{ $job->title() }}</a>
+                                <span @class(['rounded-md px-2 py-0.5 text-xs font-semibold',
+                                    'bg-brand-500/15 text-brand-400' => $st->value === 'processing',
+                                    'bg-surface-3 text-muted' => $st->value === 'queued',
+                                    'bg-success-500/15 text-success-400' => $st->value === 'completed',
+                                    'bg-danger-500/15 text-danger-400' => $st->value === 'failed'])>{{ $st->label() }}</span>
+                            </div>
+                            @if ($st->value === 'processing')
+                                <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3">
+                                    <div class="h-full rounded-full bg-brand-500 transition-all" style="width: {{ max(2, $job->analysis_progress) }}%"></div>
+                                </div>
+                            @endif
+                            <p class="mt-1.5 text-xs text-muted">
+                                @if ($st->value === 'processing'){{ $job->analysis_progress }}% · @endif
+                                {{ $job->analysis_message ?? '—' }}
+                            </p>
+                            <p class="mt-0.5 text-xs text-muted">
+                                @if ($left !== null){{ __('About :time left', ['time' => \Carbon\CarbonInterval::seconds($left)->cascade()->forHumans(['short' => true, 'parts' => 2])]) }} · @endif
+                                @if ($job->analysis_started_at && $st->value === 'processing'){{ __('started :time', ['time' => $job->analysis_started_at->diffForHumans()]) }} · @endif
+                                {{ __('updated :time', ['time' => $job->analysis_updated_at?->diffForHumans() ?? '—']) }}
+                            </p>
+                        </li>
+                    @empty
+                        <li class="px-5 py-6 text-sm text-muted">{{ __('No analyses yet.') }}</li>
+                    @endforelse
+                </ul>
+            </x-ui.card>
+
             <x-ui.card title="{{ __('New API token') }}">
                 <form wire:submit="createToken" class="space-y-4">
                     <x-ui.field label="{{ __('Name') }}" for="tokenName" error="tokenName"><input id="tokenName" wire:model="tokenName" class="input"></x-ui.field>
