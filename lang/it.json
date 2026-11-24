@@ -585,7 +585,6 @@
     "No rallies yet. They appear as the AI or the coder records touches.": "Nessuno scambio. Appariranno quando l'AI o il codificatore registra i tocchi.",
     "Not in a rally": "Fuori scambio",
     "These touches have no set or rally number. Edit them to put them in the right rally.": "Questi tocchi non hanno set o numero di scambio. Modificali per assegnarli allo scambio giusto.",
-    "Edit touch": "Modifica tocco",
     "Unknown": "Sconosciuto",
     "Use the current video time": "Usa il tempo attuale del video",
     "no time": "senza tempo",
@@ -593,5 +592,13 @@
     "Block point": "Muro punto",
     "Our error": "Nostro errore",
     "Attack blocked": "Attacco murato",
-    "Outcome unknown": "Esito sconosciuto"
+    "Outcome unknown": "Esito sconosciuto",
+    "Saved": "Salvato",
+    "Added": "Aggiunto",
+    "Time from video": "Tempo dal video",
+    "Set this touch to the current video time": "Imposta a questo tocco il tempo attuale del video",
+    "Done": "Fatto",
+    "The grade records the touch. The form stays open for the next one.": "Il voto registra subito il tocco. Il modulo resta aperto per il successivo.",
+    "Last coded in set :set": "Ultimi codificati nel set :set",
+    "Wrong touch? Pencil: every change is saved at once.": "Errore? Matita: ogni modifica si salva subito."
 }

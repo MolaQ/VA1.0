@@ -3,8 +3,8 @@
  *
  *  - click a touch / a rally time: jump the video there (the ytPlayer component around it)
  *  - the rally being played is highlighted; "follow" opens and scrolls to it as the video runs
- *  - coaches edit a touch (player, skill, grade, set / rally, time from the player)
- *    and add missed touches to a rally
+ *  - coaches add missed touches to a rally: player, skill, then a grade records it
+ *    (editing a touch happens in place, see partials/action-row)
  *
  * Roster, skills and grades come once as data, so the server does not send an edit form
  * for each of hundreds of touches.
@@ -76,21 +76,13 @@ export default (roster = [], skills = [], grades = []) => ({
         window.dispatchEvent(new CustomEvent('vva-rallies-expand', { detail: open }));
     },
 
-    // One shared form (sticky at the bottom of the tab) for editing a touch or adding one.
-    startEdit(a) {
-        this.form = { mode: 'edit', ...a, pid: a.pid === null ? '' : String(a.pid), useTime: a.t === null };
-    },
-
+    // Adding touches to a rally (sticky at the bottom of the tab): a grade records the touch at once.
     startAdd(set, rally, lastSkill = null, server = null) {
         const skill = lastSkill ? NEXT_SKILL[lastSkill] ?? 'dig' : server === 'them' ? 'reception' : 'serve';
-        this.form = { mode: 'add', set, rally, pid: '', skill, grade: '+', useTime: this.videoTime() !== null };
+        this.form = { set, rally, pid: '', skill, useTime: this.videoTime() !== null };
     },
 
-    isEditing(id) {
-        return this.form?.mode === 'edit' && this.form.id === id;
-    },
-
-    save() {
+    add(grade) {
         const f = this.form;
 
         if (!f || this.busy) {
@@ -99,11 +91,13 @@ export default (roster = [], skills = [], grades = []) => ({
 
         this.busy = true;
         const time = f.useTime ? this.videoTime() : null;
-        const pid = f.pid ? parseInt(f.pid) : null;
-        const call = f.mode === 'edit'
-            ? this.$wire.updateAction(f.id, pid, f.skill, f.grade, f.set ? parseInt(f.set) : null, f.rally ? parseInt(f.rally) : null, time)
-            : this.$wire.addAction(f.set, f.rally, pid, f.skill, f.grade, time);
-
-        call.then(() => (this.form = null)).finally(() => (this.busy = false));
+        this.$wire
+            .addAction(f.set, f.rally, f.pid ? parseInt(f.pid) : null, f.skill, grade, time)
+            .then(() => {
+                // ready for the next touch of the same rally
+                f.skill = NEXT_SKILL[f.skill] ?? 'dig';
+                f.pid = '';
+            })
+            .finally(() => (this.busy = false));
     },
 });

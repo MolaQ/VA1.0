@@ -7,6 +7,7 @@ use App\Enums\Grade;
 use App\Enums\Skill;
 use App\Events\GameActionsRecorded;
 use App\Jobs\RequestVideoAnalysis;
+use App\Livewire\Concerns\EditsActionsLive;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
 use App\Models\GameAction;
@@ -31,6 +32,7 @@ use Livewire\Component;
  */
 class GameShow extends Component
 {
+    use EditsActionsLive;
     use InteractsWithClub;
 
     #[Locked]
@@ -424,6 +426,11 @@ class GameShow extends Component
         $this->toast(__('Lineup saved.'));
     }
 
+    protected function actionsChanged(): void
+    {
+        $this->dispatch('stats-refreshed');
+    }
+
     public function reanalyze(): void
     {
         Gate::authorize('update', $this->game);
@@ -451,6 +458,18 @@ class GameShow extends Component
                 ->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
                 ->when($visible !== null, fn ($q) => $q->whereIn('player_id', $visible))
                 ->latest('id')->limit(40)->get(),
+            'recent' => $canCode
+                ? $game->actions()->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
+                    ->whereHas('set', fn ($q) => $q->where('number', $this->codingSet))
+                    ->latest('id')->limit(8)->get()
+                : collect(),
+            'codes' => $canCode ? [
+                'roster' => Player::query()->forClub($game->club_id)->where('team_id', $game->team_id)
+                    ->orderByRaw('number is null')->orderBy('number')->get()
+                    ->map(fn (Player $p) => ['id' => $p->id, 'label' => trim($p->numberLabel().($p->isAnonymous() ? '' : ' '.$p->short_name))])
+                    ->values()->all(),
+                'skills' => collect(Skill::cases())->map(fn (Skill $s) => ['value' => $s->value, 'label' => $s->label()])->all(),
+            ] : null,
             'review' => $canCode
                 ? $game->actions()->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
                     ->where('needs_review', true)->orderBy('video_time')->orderBy('id')->limit(50)->get()

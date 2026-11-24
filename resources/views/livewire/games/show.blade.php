@@ -7,6 +7,10 @@
     ];
 @endphp
 <div data-yt x-data="ytPlayer(@js($game->youtube_id))" x-on:vva-seek.window="seek($event.detail.t)">
+    @if ($codes)
+        {{-- roster and skills for editing touches in place (partials/action-row) --}}
+        <div x-data x-init="Object.assign($store.codes, @js($codes))" hidden></div>
+    @endif
     {{-- Header --}}
     <div class="mb-6 flex flex-wrap items-start justify-between gap-4 animate-fade-up">
         <div class="min-w-0">
@@ -112,26 +116,7 @@
                     <p class="px-3 pb-1 pt-1 text-xs text-muted">{{ __('Click to jump in the video.') }}</p>
                 <ul class="divide-y divide-line">
                     @forelse ($timeline as $a)
-                        <li wire:key="a-{{ $a->id }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 transition hover:bg-surface-2 {{ $loop->first ? 'animate-flash' : '' }}">
-                            <button type="button" class="flex min-w-0 flex-1 items-center gap-3 text-left" @if ($a->video_time !== null) x-on:click="jump({{ $a->video_time }})" @endif>
-                                <span class="w-12 shrink-0 text-xs tabular text-muted">{{ \App\Support\YouTube::formatTime($a->video_time) }}</span>
-                                <span class="grid size-7 shrink-0 place-items-center rounded-lg text-sm font-bold {{ $gradeStyles[$a->grade->value] }}">{{ $a->grade->value }}</span>
-                                <span class="flex min-w-0 items-center gap-1.5 text-sm"><x-jersey :player="$a->player" class="overflow-hidden" /> <span class="shrink-0 text-muted">·</span> <span class="shrink-0">{{ $a->skill->label() }}</span>@if ($a->zone_from || $a->zone_to)<span class="text-xs text-subtle">{{ $a->zone_from }}{{ $a->zone_from && $a->zone_to ? '→' : '' }}{{ $a->zone_to }}</span>@endif</span>
-                            </button>
-                            @if ($a->needs_review)
-                                <span class="text-warning-400" title="{{ __('To clarify') }}: {{ $a->reviewReason() }}"><x-icon name="flag" class="size-4" /></span>
-                            @endif
-                            @if ($a->source === \App\Enums\ActionSource::Ai)
-                                <x-ui.badge tone="accent" class="max-sm:hidden" title="{{ __('Confidence') }} {{ $a->confidence !== null ? round($a->confidence * 100).'%' : '–' }}">AI</x-ui.badge>
-                            @endif
-                            @if ($a->set)<span class="text-xs text-subtle">S{{ $a->set->number }}</span>@endif
-                            @if ($canCode && ! $a->needs_review)
-                                <button type="button" wire:click="flagAction({{ $a->id }})" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-warning-400 group-hover:opacity-100" title="{{ __('Leave to clarify') }}" aria-label="{{ __('Leave to clarify') }}"><x-icon name="flag" class="size-4" /></button>
-                            @endif
-                            @if ($canCode)
-                                <button type="button" wire:click="deleteAction({{ $a->id }})" wire:confirm="{{ __('Delete this action?') }}" class="rounded-lg p-1 text-subtle opacity-0 transition hover:text-danger-400 group-hover:opacity-100" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
-                            @endif
-                        </li>
+                        @include('livewire.games.partials.action-row', ['a' => $a, 'showSet' => true, 'flag' => true])
                     @empty
                         <li class="px-3 py-8 text-center text-sm text-muted">{{ __('No recorded actions.') }}</li>
                     @endforelse
@@ -257,6 +242,17 @@
                                 <li><kbd>{{ __('Space') }}</kbd> {{ __('play / pause') }} · <kbd>← →</kbd> ±3 s · <kbd>Esc</kbd> {{ __('clear') }}</li>
                             </ul>
                         </details>
+                    </div>
+                    <div class="mt-4 border-t border-line pt-3">
+                        <p class="label">{{ __('Last coded in set :set', ['set' => $codingSet]) }}</p>
+                        <p class="mb-1 text-xs text-muted">{{ __('Wrong touch? Pencil: every change is saved at once.') }}</p>
+                        <ul class="-mx-2">
+                            @forelse ($recent as $a)
+                                @include('livewire.games.partials.action-row', ['a' => $a, 'showSet' => true])
+                            @empty
+                                <li class="px-2 py-3 text-sm text-muted">{{ __('No recorded actions.') }}</li>
+                            @endforelse
+                        </ul>
                     </div>
                     </div>
                 @endif
