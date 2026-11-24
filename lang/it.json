@@ -595,16 +595,5 @@
     "Our error": "Nostro errore",
     "Attack blocked": "Attacco murato",
     "Opponent point": "Punto avversario",
-    "Outcome unknown": "Esito sconosciuto",
-    "Trimmed recording": "Registrazione tagliata",
-    "Cut the warm-up (or anything at the start) on YouTube? Move every time of this match by the same amount, so clicks land on the right touch again. Your corrections stay.": "Hai tagliato il riscaldamento (o altro all'inizio) su YouTube? Sposta tutti i tempi di questa partita della stessa durata, così i clic tornano sul tocco giusto. Le tue correzioni restano.",
-    "What changed": "Cosa è cambiato",
-    "Cut from the start": "Tagliato dall'inizio",
-    "Added at the start": "Aggiunto all'inizio",
-    "How long (mm:ss or seconds)": "Quanto (mm:ss o secondi)",
-    "Move every video time of this match by": "Spostare tutti i tempi video di questa partita di",
-    "Move times": "Sposta i tempi",
-    "Tip: note the time of the first serve before and after trimming; the difference is the length to enter.": "Suggerimento: guarda il tempo della prima battuta prima e dopo il taglio; la differenza è il valore da inserire.",
-    "Video times moved by :s s: :n touches.": "Tempi spostati di :s s: :n tocchi.",
-    ":n fell into the cut part and lost their time.": ":n sono finiti nella parte tagliata e hanno perso il tempo."
+    "Outcome unknown": "Esito sconosciuto"
 }
