@@ -78,11 +78,21 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'pl'),
 
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 
-    'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
+    'faker_locale' => env('APP_FAKER_LOCALE', 'pl_PL'),
+
+    /*
+    | Languages offered in the UI (code => native name). The first one is the
+    | default for visitors whose browser does not ask for a supported language.
+    */
+    'supported_locales' => [
+        'pl' => 'Polski',
+        'en' => 'English',
+        'it' => 'Italiano',
+    ],
 
     /*
     |--------------------------------------------------------------------------

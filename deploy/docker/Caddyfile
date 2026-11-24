@@ -1,0 +1,53 @@
+# VVA – Caddy / FrankenPHP configuration.
+#
+# SERVER_NAME decides how the site is served (set by deploy/vva.sh):
+#   vva.example.pl  -> automatic HTTPS (Let's Encrypt), ports 80 + 443 must reach this machine
+#   :80             -> plain HTTP (behind Cloudflare Tunnel, or LAN-only testing)
+
+{
+	skip_install_trust
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp
+
+	servers {
+		# Cloudflare Tunnel / Docker networks: trust X-Forwarded-* from private ranges.
+		trusted_proxies static private_ranges
+	}
+}
+
+(vva) {
+	root * /app/public
+
+	# Reverb WebSockets – the browser connects to wss://<domain>/app/<key>.
+	@reverb path /app /app/*
+	handle @reverb {
+		reverse_proxy {$REVERB_UPSTREAM:reverb:8080}
+	}
+
+	handle {
+		@compressible not path /build/*.woff2
+		encode @compressible zstd br gzip
+
+		@hashed path /build/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		header /sw.js Cache-Control "no-cache"
+		header {
+			X-Content-Type-Options nosniff
+			Referrer-Policy strict-origin-when-cross-origin
+			-Server
+			-X-Powered-By
+		}
+
+		php_server
+	}
+}
+
+{$SERVER_NAME::80} {
+	import vva
+}
+
+# Plain-HTTP access from inside Docker (health checks, future AI analyzer -> API).
+http://app, http://localhost {
+	import vva
+}

@@ -1,0 +1,28 @@
+# Przyszły moduł AI na GPU (np. RTX 3060) – szablon, jeszcze nieaktywny.
+#
+# Włączenie: skopiuj do compose.gpu.yml, popraw "build"/"image", a w .env dopisz
+#   COMPOSE_FILE=compose.yml:compose.gpu.yml
+#   VVA_ANALYZER_URL=http://analyzer:8000
+# Wymaga sterownika NVIDIA i NVIDIA Container Toolkit (Linux) albo
+# Docker Desktop + WSL2 (Windows). Test: docker run --rm --gpus all nvidia/cuda:12.6.3-base-ubuntu24.04 nvidia-smi
+
+services:
+  analyzer:
+    build: ../analyzer            # katalog z modułem AI (gdy powstanie)
+    restart: unless-stopped
+    environment:
+      # Analizator odsyła wyniki przez API VVA wewnątrz sieci Dockera.
+      VVA_API_URL: http://app/api/v1
+      VVA_ANALYZER_TOKEN: ${VVA_ANALYZER_TOKEN:-}
+    volumes:
+      - analyzer_cache:/cache     # modele, pobrane nagrania
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  analyzer_cache:

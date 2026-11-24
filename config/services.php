@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    /*
+    | External AI video-analysis pipeline. When `url` is set, every new match with a
+    | YouTube link is sent there; the pipeline reports back through /api/v1.
+    */
+    'analyzer' => [
+        'url' => env('VVA_ANALYZER_URL'),
+        'token' => env('VVA_ANALYZER_TOKEN'),
+        'timeout' => (int) env('VVA_ANALYZER_TIMEOUT', 15),
+    ],
+
 ];
