@@ -40,6 +40,7 @@ class Person:
     `num` / `num_conf`: jersey number read from the torso (jersey.py), when it was tried.
     `sig`: how the player looks (appearance.py), taken now and then.
     `tid`: the id BoT-SORT gave this box (reid.py); the tracks then follow it instead of distance.
+    `sh`: the shoulders seen by YOLO-pose (pose.py); they give the facing better than movement.
     """
 
     x: float
@@ -51,6 +52,8 @@ class Person:
     num_conf: float = 0.0
     sig: list[float] | None = None  # look: shoes + head colours (appearance.py)
     tid: int | None = None  # BoT-SORT track id on every frame (reid.py), when it ran
+    crop: str | None = None  # file of this person's crop (dataset.py), when one was cut out
+    sh: list[float] | None = None  # shoulders from YOLO-pose: left x, y, right x, y (normalised)
 
 
 @dataclass
@@ -178,6 +181,24 @@ def heading(dx: float, dy: float) -> float:
     return round(math.degrees(math.atan2(dx, dy)) % 360, 0)
 
 
+def body_facing(h: np.ndarray, p: Person, min_m: float = 0.15) -> float | None:
+    """Facing from the shoulders: the shoulder line moved down to the feet and mapped onto the
+    floor; forward is the left->right shoulder vector turned 90 degrees to the left (from above).
+    None when the shoulders are too close together to tell (seen exactly from the side)."""
+    if not p.sh or len(p.sh) != 4:
+        return None
+    lx, ly, rx, ry = p.sh
+    drop = p.y - (ly + ry) / 2  # shoulders -> feet height in the picture
+    a = to_court(h, lx, ly + drop)
+    b = to_court(h, rx, ry + drop)
+    if not all(math.isfinite(v) for v in (*a, *b)):
+        return None
+    vx, vy = b[0] - a[0], b[1] - a[1]
+    if math.hypot(vx, vy) < min_m:
+        return None
+    return heading(-vy, vx)
+
+
 def _towards_net(y: float) -> float:
     return 0.0 if y < NET_Y else 180.0
 
@@ -273,6 +294,8 @@ def track_players(
         seen = []
         points = to_court_points(h, people)
         for tr, person in (tracker.follow(t, points) if by_id else tracker.match(t, points)):
+            if person is not None and person.sh and (f := body_facing(h, person)) is not None:
+                tr.facing = f  # the shoulders say where the body faces, also when standing still
             tracks[tr.id] = tr
             seen.append(Seen(tr.id, round(tr.x, 2), round(tr.y, 2), tr.facing, person))
         if seen:

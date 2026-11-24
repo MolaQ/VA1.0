@@ -72,6 +72,13 @@ class Settings:
     # "simple": join the dots by distance. Without BoxMOT installed "simple" is used anyway.
     tracker: str = "botsort"
     reid_model: str = "osnet-x0-25-msmt17"
+    # Facing from the shoulders (YOLO-pose) instead of the direction of movement
+    pose: bool = True
+    pose_model: str = "yolo11s-pose.pt"
+    pose_every_s: float = 1.0
+    # Player crops for our own training set (dataset.py, `train-players`)
+    crops: bool = True
+    crops_every_s: float = 6.0
     # Ball activity -> rallies
     gap_merge_s: float = 1.2  # detections closer than this belong to one activity segment
     min_segment_s: float = 1.0

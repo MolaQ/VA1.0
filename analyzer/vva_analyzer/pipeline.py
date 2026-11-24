@@ -35,6 +35,9 @@ class Job:
         self.looks: dict[int, dict] = {}  # jersey number -> learned look (appearance.py)
         self.gallery: dict[int, dict] = {}  # jersey number -> learned re-ID fingerprint (reid.py)
         self.prints: dict[int, dict] = {}  # BoT-SORT track id -> mean fingerprint of this video
+        self.video_stem = "video"
+        self.scanning = False  # partial results during the scan skip the slow player model
+        self.last: tuple | None = None  # (tracking, our track ids, numbers before the look-based guesses)
         self.on_progress = on_progress or (lambda p, m: log.info("%3d%% %s", p, m))
         self.obs: list[ral.BallObs] = []
         self.readings: list[Reading] = []
@@ -62,6 +65,7 @@ class Job:
         self.looks = appearance.load(self.looks_file())
         self.gallery = reid.load(self.looks_file("reid"))
 
+        self.video_stem = video.stem
         cache = self.workdir / f"{video.stem}.detections.json"
         if reuse and cache.exists():
             self._load(cache)
@@ -71,7 +75,11 @@ class Job:
                 self._read_scores(video, vid)
                 self._save(cache)
         else:
-            self._scan(video, vid)
+            self.scanning = True
+            try:
+                self._scan(video, vid)
+            finally:
+                self.scanning = False
             self._save(cache)
 
         self.progress(88, "Szukam gwizdka sędziego w dźwięku")
@@ -88,6 +96,7 @@ class Job:
         if getattr(self, "learned_prints", None):
             from . import reid
             reid.save(self.looks_file("reid"), self.learned_prints)
+        self._export_crops()
         report_path = self.workdir / f"{video.stem}.report.json"
         report_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
         log.info("report: %s", report_path)
@@ -131,6 +140,16 @@ class Job:
             else:
                 log.info("BoxMOT not installed (pip install .[tracking]): simple tracker")
         court_h = homography(self.cal.court, 1, 1, self.cal.court_ref) if want_people else None
+        poser = None
+        if want_people and self.s.pose:
+            try:
+                from .pose import PoseReader
+                poser = PoseReader(self.s.pose_model, self.device, self.s.detect_size, self.s.person_conf)
+            except Exception as e:  # facing then comes from the movement
+                log.warning("YOLO-pose off: %s", e)
+        crops_dir = self.crops_dir() if want_people and self.s.crops else None
+        next_pose = [0.0]
+        next_crop = [0.0]
         last_pct = -1
         last_publish = 0
 
@@ -154,6 +173,19 @@ class Job:
                         except Exception as e:  # looks are extra
                             log.debug("no signature: %s", e)
                         next_num[0] = t + self.s.jersey_every_s
+                    if poser is not None and t >= next_pose[0]:
+                        try:
+                            poser.read(frame, people)
+                        except Exception as e:
+                            log.debug("no pose: %s", e)
+                        next_pose[0] = t + self.s.pose_every_s
+                    if crops_dir is not None and t >= next_crop[0]:
+                        try:
+                            from .dataset import save_crops
+                            save_crops(frame, people, t, crops_dir, court_h)
+                        except Exception as e:  # training material is extra
+                            log.debug("no crops: %s", e)
+                        next_crop[0] = t + self.s.crops_every_s
                     self.people.append((t, people))
                     next_pos[0] = t + self.s.positions_every_s
                 if found is None:
@@ -235,11 +267,14 @@ class Job:
         if tracking is not None and self.lineups:
             from .rotation import rotation_votes
             rotation_matches = rotation_votes(rallies, tracking, self.lineups, self.cal.our_side_set1, self.liberos, self.middles)
-        reid_matched = 0
+        reid_matched = model_matched = 0
         if tracking is not None:
             ours = self._ours(tracking, sets)
+            trusted = dict(tracking.numbers)  # analyst, rotations, OCR: what the crops are labelled with
             reid_matched = self._reid(tracking, ours)
             looks_matched = self._appearance(tracking, ours)
+            model_matched = self._player_model_votes(tracking, ours)
+            self.last = (tracking, ours, trusted)
         frames = self.player_frames(sets, tracking)
         receptions, serve_extra = [], {}
         if tracking is not None:
@@ -266,6 +301,7 @@ class Job:
                 "rotation_matches": rotation_matches,
                 "looks_matched": looks_matched,
                 "reid_matched": reid_matched,
+                "model_matched": model_matched,
                 "receptions": len(receptions),
                 "serves_with_point": len(serve_extra),
             },
@@ -316,6 +352,38 @@ class Job:
         matched = appearance.appearance_votes(tracking, looks, known, self.roster or None, ours)
         self.learned = known  # learned only from numbers that did not come from the looks themselves
         return matched
+
+    def crops_dir(self) -> Path:
+        return self.workdir / "crops" / self.video_stem
+
+    def dataset_dir(self) -> Path:
+        return self.workdir / (f"dataset-team{self.team_id}" if self.team_id else "dataset")
+
+    def _player_model_votes(self, tracking, ours: set[int]) -> int:
+        """Votes of our own trained player model (train-players), when there is one."""
+        path = self.looks_file("players").with_suffix(".pt")
+        if self.scanning or not path.exists() or not self.crops_dir().exists():
+            return 0
+        from . import dataset
+
+        try:
+            if getattr(self, "_model", None) is None:
+                self._model = dataset.PlayerModel(path, self.device)
+            return dataset.model_votes(tracking, self.crops_dir(), self._model.probs, ours, self.roster or None)
+        except Exception as e:  # the model is extra
+            log.warning("player model skipped: %s", e)
+            return 0
+
+    def _export_crops(self) -> None:
+        """Label this video's crops with the numbers now known: material for train-players."""
+        if self.last is None or not self.crops_dir().exists():
+            return
+        from . import dataset
+
+        tracking, ours, trusted = self.last
+        n = dataset.export(tracking, trusted, self.crops_dir(), self.dataset_dir(), self.video_stem,
+                           set(self.labels), self.roster or None, ours)
+        log.info("zbiór do nauki / training crops: +%d in %s", n, self.dataset_dir())
 
     def looks_file(self, kind: str = "looks") -> Path:
         return self.workdir / (f"{kind}-team{self.team_id}.json" if self.team_id else f"{kind}.json")
@@ -377,7 +445,8 @@ class Job:
         data = {
             "obs": [[o.t, o.x, o.y, o.conf, o.half] for o in self.obs],
             "readings": [[r.t, r.left, r.right, int(r.replay)] for r in self.readings],
-            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2), round(p.w, 4), round(p.h, 4), p.num, round(p.num_conf, 2), p.sig, p.tid]
+            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2), round(p.w, 4), round(p.h, 4), p.num, round(p.num_conf, 2), p.sig, p.tid,
+                             p.crop, p.sh]
                             for p in ps]] for t, ps in self.people],
             "prints": {str(k): v for k, v in self.prints.items()},
         }

@@ -140,7 +140,7 @@ try {
     $data = Join-Path $env:APPDATA 'VVA Analyzer'
     New-Item -ItemType Directory -Force -Path $data | Out-Null
     Push-Location $data
-    & $vpy -c "from ultralytics import YOLO; YOLO('yolo11s.pt'); import easyocr; easyocr.Reader(['en'], gpu=False, verbose=False); import torch; print('GPU:', torch.cuda.is_available())"
+    & $vpy -c "from ultralytics import YOLO; YOLO('yolo11s.pt'); YOLO('yolo11s-pose.pt'); import easyocr; easyocr.Reader(['en'], gpu=False, verbose=False); import torch; print('GPU:', torch.cuda.is_available())"
     if ($LASTEXITCODE -ne 0) { Write-Host 'Modele pobiorą się przy pierwszej analizie.' -ForegroundColor Yellow }
     Pop-Location
 

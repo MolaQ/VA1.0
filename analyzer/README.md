@@ -112,7 +112,29 @@ wymusza go). Ta sama sieć daje „odcisk” zawodnika (wektor 512 liczb): ślad
 (OCR, rotacja, poprawka analityka) uczą odcisku numeru, a ślady bez numeru dostają głos na
 najbliższy odcisk, gdy jest wyraźnie bliższy od drugiego. Odciski są pamiętane per drużyna w
 `work/reid-team<id>.json`, więc każdy mecz i każda poprawka poprawia rozpoznawanie.
-Odciski i identyfikatory BoT-SORT trafiają do `*.detections.json`; dla starszych plików uruchom z `--fresh`. Kierunek ciała (trójkącik przy kropce) to kierunek ruchu; stojący zawodnik „patrzy”
+Odciski i identyfikatory BoT-SORT trafiają do `*.detections.json`; dla starszych plików uruchom z `--fresh`.
+
+**Kierunek ciała z barków (YOLO-pose).** Raz na sekundę model `yolo11s-pose` znajduje barki
+każdego zawodnika. Linia barków przeniesiona na wysokość stóp i zrzutowana na parkiet daje
+kierunek, w którą stronę jest zwrócony tułów, także gdy zawodnik stoi albo przesuwa się bokiem.
+Gdy barki są niewidoczne lub ustawione dokładnie bokiem do kamery, zostaje kierunek ruchu
+(`Settings.pose = False` wyłącza pozy).
+
+**Własny model naszych zawodników (`train-players`).** Co 6 s program wycina z obrazu każdego
+zawodnika na boisku (`work/crops/<film>/`). Po analizie wycinki śladów ze znanym numerem
+(poprawka analityka, rotacja, OCR; nie zgadywanie z wyglądu, żeby model nie uczył się
+własnych pomyłek) trafiają do `work/dataset-team<id>/<numer>/`, a `manifest.csv` mówi, czy
+numer potwierdził człowiek (`analyst`), czy AI (`auto`). Ponowna analiza tego samego meczu po
+poprawkach podmienia jego wycinki. Gdy zbierze się materiał (najlepiej 2-3 mecze), uruchom:
+
+```powershell
+python -m vva_analyzer train-players --team 5
+```
+
+Uczy się mały klasyfikator YOLO (`yolo11n-cls`, kilka minut na RTX 3060) rozpoznający naszych
+zawodników po wszystkim naraz: twarzy, włosach, sylwetce, butach i numerze. Zapisuje
+`work/players-team<id>.pt`; kolejne analizy dają nim głos śladom bez numeru. Wszystko działa
+lokalnie i za darmo; im więcej poprawek w widoku 2D, tym lepszy model po następnym treningu. Kierunek ciała (trójkącik przy kropce) to kierunek ruchu; stojący zawodnik „patrzy”
 na siatkę. Drużyna wynika z połowy boiska i seta (strony zmieniają się co set).
 
 Co 0,5 s powstaje klatka pozycji, wysyłana na końcu analizy do `POST /api/v1/games/{id}/frames`.
