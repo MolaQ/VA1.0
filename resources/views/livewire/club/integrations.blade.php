@@ -31,8 +31,16 @@
                     <div class="mt-5 rounded-xl border border-success-500/30 bg-success-500/10 p-4" x-data="{ copied: false }">
                         <p class="text-sm font-semibold text-success-400">{{ __('Copy the token now: we won\'t show it again.') }}</p>
                         <div class="mt-2 flex items-center gap-2">
-                            <code class="min-w-0 flex-1 truncate rounded-lg bg-surface-3 px-3 py-2 text-xs">{{ $plainToken }}</code>
-                            <x-ui.button size="sm" variant="secondary" x-on:click="navigator.clipboard.writeText(@js($plainToken)); copied = true">
+                            {{-- an input, so the whole token can also be selected by hand (Ctrl+A, Ctrl+C) --}}
+                            <input x-ref="token" readonly value="{{ $plainToken }}" x-on:focus="$el.select()"
+                                   class="input min-w-0 flex-1 !py-2 font-mono text-xs">
+                            <x-ui.button size="sm" variant="secondary" x-on:click="
+                                const text = $refs.token.value;
+                                const fallback = () => { $refs.token.focus(); $refs.token.select(); copied = document.execCommand('copy'); };
+                                if (navigator.clipboard && window.isSecureContext) {
+                                    navigator.clipboard.writeText(text).then(() => copied = true, fallback);
+                                } else { fallback(); }
+                            ">
                                 <x-icon name="copy" class="size-4" /><span x-text="copied ? @js(__('Copied')) : @js(__('Copy'))"></span>
                             </x-ui.button>
                         </div>
