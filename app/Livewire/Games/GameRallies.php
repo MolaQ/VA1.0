@@ -279,7 +279,8 @@ class GameRallies extends Component
                 $grade === Grade::Perfect && $skill === Skill::Serve => __('Ace'),
                 $grade === Grade::Perfect && $skill === Skill::Attack => __('Attack kill'),
                 $grade === Grade::Perfect && $skill === Skill::Block => __('Block point'),
-                default => __('Opponent error or point'),
+                // our touches do not tell how (e.g. the AI only reads the score)
+                default => __('Point us'),
             };
         }
 
@@ -287,7 +288,7 @@ class GameRallies extends Component
             return match (true) {
                 $grade === Grade::Slash && $skill === Skill::Attack => __('Attack blocked'),
                 $skill !== null && in_array($grade, [Grade::Error, Grade::Slash], true) => __('Our error').': '.$skill->label(),
-                default => __('Opponent point'),
+                default => __('Point opponent'),
             };
         }
 
