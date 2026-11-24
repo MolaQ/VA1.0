@@ -123,7 +123,11 @@ it('adds touches and rallies, and overrides who won', function () {
         ->and(collect($rallies)->pluck('number')->all())->toBe([1, 2, 3, 4]);
 
     $component->call('addAction', 1, 3, 999999, 'dig', '-')->assertStatus(422);
-    $component->call('patchAction', $game->actions()->first()->id, 'grade', 'x')->assertStatus(422);
+
+    Livewire::actingAs(member($club, Role::Trainer))
+        ->test(GameRallies::class, ['game' => $game])
+        ->call('patchAction', $game->actions()->first()->id, 'grade', 'x')
+        ->assertStatus(422);
 });
 
 it('lets players watch the rallies but not edit them', function () {
