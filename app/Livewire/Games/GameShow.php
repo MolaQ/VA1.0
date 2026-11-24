@@ -63,6 +63,8 @@ class GameShow extends Component
         return [
             'echo-private:games.'.$this->game->id.',.actions.recorded' => 'onActionsRecorded',
             'echo-private:games.'.$this->game->id.',.analysis.updated' => 'onAnalysisUpdated',
+            // the point-by-point tab corrected something: the box score re-renders with it
+            'rallies-changed' => '$refresh',
         ];
     }
 
@@ -178,6 +180,8 @@ class GameShow extends Component
         if (in_array($grade, ['#', '='], true) && $skill !== Skill::Reception->value) {
             $this->rally++;
         }
+
+        $this->dispatch('stats-refreshed');
     }
 
     /**
@@ -226,6 +230,7 @@ class GameShow extends Component
 
         $action->fill(['needs_review' => false, 'reviewed_at' => now()])->save();
         GameActionsRecorded::dispatch($this->game, 0, 1, 0, [$action->toBroadcast()]);
+        $this->dispatch('stats-refreshed');
     }
 
     /**
@@ -240,6 +245,7 @@ class GameShow extends Component
             'needs_review' => true,
             'review_note' => $note !== '' ? $note : null,
         ]);
+        $this->dispatch('stats-refreshed');
     }
 
     /**
@@ -367,6 +373,7 @@ class GameShow extends Component
 
         $action = $this->game->actions()->findOrFail($actionId);
         $ingestor->delete($action);
+        $this->dispatch('stats-refreshed');
         $this->toast(__('Action deleted.'));
     }
 

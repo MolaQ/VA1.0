@@ -90,7 +90,7 @@
 
         {{-- Side panel: timeline, quick pick, coding, review queue as tabs --}}
         @php
-            $tabs = ['timeline' => __('Timeline')];
+            $tabs = ['timeline' => __('Timeline'), 'rallies' => __('Point by point')];
             if ($game->youtube_id) { $tabs['pick'] = __('Quick pick'); }
             if ($canCode) { $tabs['coding'] = __('Coding'); }
             if ($canCode && $reviewCount > 0) { $tabs['review'] = __('To clarify'); }
@@ -136,6 +136,10 @@
                         <li class="px-3 py-8 text-center text-sm text-muted">{{ __('No recorded actions.') }}</li>
                     @endforelse
                 </ul>
+                </div>
+
+                <div x-show="tab === 'rallies'" x-cloak>
+                    <livewire:games.game-rallies :game="$game" :key="'rallies-'.$game->id" />
                 </div>
 
                 @if ($game->youtube_id)
