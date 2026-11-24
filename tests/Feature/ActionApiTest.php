@@ -10,6 +10,7 @@ use App\Livewire\Club\Integrations;
 use App\Livewire\Games\GameShow;
 use App\Models\Club;
 use App\Models\SetLineup;
+use App\Support\MatchTransfer;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 
@@ -231,4 +232,28 @@ it('puts an interrupted analysis back in the queue', function () {
 
     expect($game->fresh()->analysis_status)->toBe(AnalysisStatus::Queued);
     $this->artisan('vva:queue')->assertSuccessful();
+});
+
+it('moves a match with its analysis to another VVA through a file', function () {
+    ['club' => $club, 'team' => $team, 'game' => $game, 'players' => $players] = clubWithGame();
+    $set = $game->sets()->create(['number' => 1, 'score_us' => 25, 'score_them' => 22]);
+    $set->lineups()->create(['player_id' => $players[1]->id, 'rotation_position' => 1]);
+    Sanctum::actingAs(member($club, Role::Admin), ['analysis:write']);
+    $this->postJson("/api/v1/games/{$game->id}/actions", ['actions' => [
+        ['external_id' => 'a1', 'set' => 1, 'rally' => 1, 'player_number' => 13, 'skill' => 'serve', 'grade' => '#'],
+    ]])->assertCreated();
+
+    $file = MatchTransfer::export($game->fresh());
+    $json = json_decode(json_encode($file), true);
+
+    // "another computer": a different club/team with the player not there yet
+    $other = clubWithGame();
+    $copy = MatchTransfer::import($json, $other['club'], $other['team']);
+
+    expect($copy->id)->not->toBe($game->id)
+        ->and($copy->sets()->first()->score_us)->toBe(25)
+        ->and($copy->actions()->count())->toBe(1)
+        ->and($copy->actions()->first()->player->number)->toBe(13)
+        ->and($copy->actions()->first()->player->team_id)->toBe($other['team']->id)
+        ->and($copy->sets()->first()->lineups()->first()->rotation_position)->toBe(1);
 });

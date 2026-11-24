@@ -3,7 +3,9 @@
 use App\Models\Club;
 use App\Models\Game;
 use App\Models\PageView;
+use App\Models\Team;
 use App\Models\User;
+use App\Support\MatchTransfer;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -78,6 +80,56 @@ Artisan::command('vva:queue {--reset : put interrupted analyses (processing) bac
 
     return 0;
 })->purpose('Show the analysis queue (and reset interrupted analyses)');
+
+Artisan::command('vva:export {game : match id (from the address /games/ID)} {file? : output file}', function () {
+    $game = Game::query()->find((int) $this->argument('game'));
+    if ($game === null) {
+        $this->error('Nie ma meczu o tym numerze.');
+
+        return 1;
+    }
+    $fileArg = $this->argument('file');
+    $file = is_string($fileArg) && $fileArg !== '' ? $fileArg : 'mecz-'.$game->id.'.vva.json';
+    file_put_contents($file, json_encode(MatchTransfer::export($game), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    $this->info("Zapisano mecz {$game->id} ({$game->opponent}) do pliku: ".realpath($file));
+
+    return 0;
+})->purpose('Save one match with its analysis to a file (to move it to another VVA)');
+
+Artisan::command('vva:import {file} {--club= : club id (default: the only/first club)} {--team= : team id (default: team with the same name, else the first)}', function () {
+    $fileArg = $this->argument('file');
+    $file = is_string($fileArg) ? $fileArg : '';
+    if (! is_file($file)) {
+        $this->error("Nie ma pliku {$file}");
+
+        return 1;
+    }
+    $data = json_decode((string) file_get_contents($file), true);
+    if (! is_array($data)) {
+        $this->error('Plik nie jest poprawnym JSON-em.');
+
+        return 1;
+    }
+    $club = $this->option('club') ? Club::query()->find((int) $this->option('club'))
+        : (Club::query()->where('name', $data['club'] ?? '')->first() ?? Club::query()->orderBy('id')->first());
+    if ($club === null) {
+        $this->error('Brak klubu w tej bazie.');
+
+        return 1;
+    }
+    $team = $this->option('team') ? Team::query()->where('club_id', $club->id)->find((int) $this->option('team'))
+        : (Team::query()->where('club_id', $club->id)->where('name', $data['team'] ?? '')->first()
+            ?? Team::query()->where('club_id', $club->id)->orderBy('id')->first());
+    if ($team === null) {
+        $this->error("Klub {$club->name} nie ma drużyny.");
+
+        return 1;
+    }
+    $game = MatchTransfer::import($data, $club, $team);
+    $this->info("Zaimportowano jako mecz {$game->id}: {$club->name} / {$team->name} vs {$game->opponent}");
+
+    return 0;
+})->purpose('Load a match saved with vva:export');
 
 // Cookie-less analytics: delete raw page views past the retention window.
 Schedule::command('model:prune', ['--model' => [PageView::class]])->daily();

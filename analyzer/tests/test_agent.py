@@ -52,3 +52,11 @@ def test_config_saved_by_notepad_with_bom(tmp_path):
     assert ag.AgentConfig.load(tmp_path / "c.json").token == "1|a"
     (tmp_path / "bad.json").write_text("{nie json")
     assert not ag.AgentConfig.load(tmp_path / "bad.json").ready
+
+
+def test_saved_scan_skips_the_download(tmp_path):
+    (tmp_path / "abc.detections.json").write_text(json.dumps({"obs": [[1, 0.5, 0.5, 0.9, None]], "readings": [[0, 1, 0, 0]]}))
+    assert ag._complete_cache(tmp_path, "abc") == tmp_path / "abc.mp4"
+    (tmp_path / "old.detections.json").write_text(json.dumps({"obs": [[1, 0.5, 0.5, 0.9, None]], "readings": [[0, 1, 0]]}))
+    assert ag._complete_cache(tmp_path, "old") is None
+    assert ag._complete_cache(tmp_path, "none") is None

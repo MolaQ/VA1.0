@@ -172,15 +172,21 @@ class Agent:
             self._set("working", f"{title}: {msg}", pct)
 
         try:
-            self._set("working", f"{title}: pobieranie", 0)
-            path = vid.download(url, workdir, on_progress=dl)
+            cached = _complete_cache(workdir, game.get("youtube_id"))
+            if cached is not None:
+                # scanned before (here or on another computer: copy the work folder): no download needed
+                self._set("working", f"{title}: używam zapisanej analizy obrazu", 80)
+                path = cached
+            else:
+                self._set("working", f"{title}: pobieranie", 0)
+                path = vid.download(url, workdir, on_progress=dl)
             client.purge_ai(gid)
             job = Job(cal, Settings(), workdir, client, gid, self.cfg.device, on_progress=prog)
             result = job.run(path)
             sets = ", ".join(f"{x['us']}:{x['them']}" for x in result["sets"]) or "brak wyniku"
             self.state.done.append({"game_id": gid, "ok": True, "sets": sets, "at": time.time()})
             self._set("idle", f"Gotowe: {title} ({sets})", 100)
-            if not self.cfg.keep_videos:
+            if not self.cfg.keep_videos and path.exists():
                 path.unlink(missing_ok=True)
         except Exception as e:
             log.exception("analysis of game %s failed", gid)
@@ -192,3 +198,21 @@ class Agent:
                 pass
         finally:
             self.state.game_id = None
+
+
+def _complete_cache(workdir: Path, youtube_id: str | None) -> Path | None:
+    """Video path for a match whose detections are already saved (the video itself may be gone)."""
+    if not youtube_id:
+        return None
+    cache = workdir / f"{youtube_id}.detections.json"
+    if not cache.exists():
+        return None
+    try:
+        data = json.loads(cache.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return None
+    readings = data.get("readings") or []
+    if not data.get("obs") or not readings or len(readings[0]) < 4:  # older caches lack replay info
+        return None
+    return workdir / f"{youtube_id}.mp4"
+
