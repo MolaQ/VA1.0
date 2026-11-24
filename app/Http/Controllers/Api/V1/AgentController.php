@@ -35,7 +35,8 @@ class AgentController extends Controller
                     ->where('analysis_status', AnalysisStatus::Queued->value)
                     ->orWhere(fn ($q) => $q
                         ->where('analysis_status', AnalysisStatus::Processing->value)
-                        ->where('analysis_updated_at', '<', now()->subMinutes(self::STALE_MINUTES))))
+                        ->where(fn ($q) => $q->whereNull('analysis_updated_at')
+                            ->orWhere('analysis_updated_at', '<', now()->subMinutes(self::STALE_MINUTES)))))
                 ->orderBy('analysis_updated_at')
                 ->orderBy('id')
                 ->lockForUpdate()
