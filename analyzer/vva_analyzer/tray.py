@@ -166,6 +166,23 @@ def ask_url(default: str = "") -> str | None:
     return url.strip() if url else None
 
 
+def ask_ours_first() -> bool:
+    import tkinter as tk
+    from tkinter import messagebox
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    answer = messagebox.askyesno(
+        "Kalibracja kamery",
+        "Czy NASZA drużyna jest w PIERWSZYM wierszu wyniku (górnym lub lewym)?\n\n"
+        "Tak = pierwszy wiersz, Nie = drugi wiersz.",
+        parent=root,
+    )
+    root.destroy()
+    return bool(answer)
+
+
 def info(text: str, error: bool = False) -> None:
     import tkinter as tk
     from tkinter import messagebox
@@ -253,7 +270,8 @@ class TrayApp:
                 cal_path = self.cfg.calibration_path
                 existing = Calibration.load(cal_path) if cal_path.exists() else None
                 _, _, _, duration = vid.info(path)
-                cal = calibrate.run(vid.frame_at(path, min(600.0, (duration or 1200) / 2)), existing)
+                cal = calibrate.run(vid.frame_at(path, min(600.0, (duration or 1200) / 2)), existing,
+                                    ours_first=ask_ours_first)
                 cal.save(cal_path)
             if cal.has_scoreboard:
                 info("Kalibracja zapisana. Agent zaczyna pobierać mecze do analizy.")

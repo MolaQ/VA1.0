@@ -1,6 +1,6 @@
 ﻿; VVA Analyzer installer (Inno Setup 6, free: https://jrsoftware.org/isinfo.php)
 ; Built automatically by .github/workflows/analyzer-installer.yml; by hand: iscc vva-analyzer.iss
-#define AppVersion "0.2.6"
+#define AppVersion "0.2.7"
 
 [Setup]
 AppId={{C092ABA3-89AA-4355-90C2-E01CEA11F119}

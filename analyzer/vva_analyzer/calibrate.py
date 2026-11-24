@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from .config import Calibration
 
-def run(frame, existing: Calibration | None = None) -> Calibration:
+def _ask_console() -> bool:
+    answer = input("Is OUR team the first (left/top) or second (right/bottom) on the overlay? [l/r] ").strip().lower()
+    return not answer.startswith("r")
+
+
+def run(frame, existing: Calibration | None = None, ours_first=None) -> Calibration:
+    """`ours_first()` answers whether our team is the first row of the score overlay
+    (console question by default; the tray app passes a dialog, pythonw has no console)."""
     import cv2
 
     from .autocourt import suggest
@@ -84,8 +91,7 @@ def run(frame, existing: Calibration | None = None) -> Calibration:
     print("Pola wyniku zaznaczone." if cal.has_scoreboard else "UWAGA: pola wyniku NIE zostały zaznaczone (bez nich nie będzie setów).")
 
     if cal.has_scoreboard:
-        answer = input("Is OUR team the first (left/top) or second (right/bottom) on the overlay? [l/r] ").strip().lower()
-        cal.our_score = "right" if answer.startswith("r") else "left"
+        cal.our_score = "left" if (ours_first or _ask_console)() else "right"
     return cal
 
 
