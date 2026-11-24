@@ -5,19 +5,25 @@ from __future__ import annotations
 from .rallies import Rally
 
 
-def serve_actions(rallies: list[Rally]) -> list[dict]:
-    """One serve per rally served by our team, with the server's number when the rotation is known."""
+def serve_actions(rallies: list[Rally], extra: dict[tuple[int, int], dict] | None = None) -> list[dict]:
+    """One serve per rally served by our team, with the server's number when the rotation is known.
+
+    `extra` (from touches.ball_actions): where the opponent received it and, when the pass
+    was seen, the serve grade paired with their reception."""
+    extra = extra or {}
     out = []
     for r in rallies:
         if r.server != "us" or r.serve_grade is None:
             continue
+        more = extra.get((r.set, r.number), {})
         out.append({
             "external_id": f"s1-set{r.set}-r{r.number}-serve",
             "set": r.set,
             "rally": r.number,
             **({"player_number": r.server_number} if r.server_number is not None else {}),
             "skill": "serve",
-            "grade": r.serve_grade,
+            "grade": more.get("grade", r.serve_grade),
+            **({"to_x": more["to_x"], "to_y": more["to_y"]} if "to_x" in more else {}),
             "video_time": round(r.start, 2) if r.start is not None else None,
             "confidence": round(r.confidence, 2),
             "meta": {
@@ -25,6 +31,7 @@ def serve_actions(rallies: list[Rally]) -> list[dict]:
                 "rally_won": r.winner == "us",
                 "duration": round(r.duration, 1) if r.duration is not None else None,
                 "score_before": list(r.score_before),
+                **({"opponent_reception": more["opponent_reception"]} if "opponent_reception" in more else {}),
             },
         })
     return out
