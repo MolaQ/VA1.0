@@ -58,6 +58,9 @@ class Rally:
     server_number: int | None = None  # jersey number of our server (from the starting rotation)
     rotation: int | None = None  # our side-outs so far in the set (0 = starting lineup), known with a lineup
     confidence: float = 0.5
+    # No play matched (start is None): the rally happened between the previous scoreboard
+    # update and this one, so the previous update is where to start looking in the video.
+    approx_time: float | None = None
 
     @property
     def duration(self) -> float | None:
@@ -192,6 +195,7 @@ def build(
                 serve_side=serve_side(cand) if cand else None,
                 crossings=crossings(cand) if cand else None,
                 confidence=0.8 if cand else 0.4,
+                approx_time=None if cand else round(prev.t, 2),
             )
             rally.server = _server(rallies, rally, our_side_set1, first_serve)
             rally.serve_grade = _serve_grade(rally, s)

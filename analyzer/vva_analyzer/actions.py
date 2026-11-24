@@ -24,13 +24,14 @@ def serve_actions(rallies: list[Rally], extra: dict[tuple[int, int], dict] | Non
             "skill": "serve",
             "grade": more.get("grade", r.serve_grade),
             **({"to_x": more["to_x"], "to_y": more["to_y"]} if "to_x" in more else {}),
-            "video_time": round(r.start, 2) if r.start is not None else None,
+            "video_time": round(r.start, 2) if r.start is not None else r.approx_time,
             "confidence": round(r.confidence, 2),
             "meta": {
                 "stage": 2 if r.server_number is not None else 1,
                 "rally_won": r.winner == "us",
                 "duration": round(r.duration, 1) if r.duration is not None else None,
                 "score_before": list(r.score_before),
+                **({"time_approx": True} if r.start is None and r.approx_time is not None else {}),
                 **({"opponent_reception": more["opponent_reception"]} if "opponent_reception" in more else {}),
             },
         })

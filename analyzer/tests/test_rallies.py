@@ -93,6 +93,8 @@ def test_overlay_correction_removes_the_last_point():
 def test_missed_reads_still_count_every_point():
     rallies, sets = build([], [ScoreEvent(30, 3, 1)], S)
     assert len(rallies) == 4 and all(r.start is None for r in rallies)
+    # still a place to look in the video: after the previous scoreboard update
+    assert all(r.approx_time == 0.0 for r in rallies)
     assert (sets[0].us, sets[0].them) == (3, 1)
 
 

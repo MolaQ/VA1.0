@@ -7,6 +7,7 @@ use App\Enums\Grade;
 use App\Enums\Skill;
 use App\Events\GameActionsRecorded;
 use App\Jobs\RequestVideoAnalysis;
+use App\Livewire\Concerns\EditsActionsLive;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
 use App\Models\GameAction;
@@ -32,6 +33,7 @@ use Livewire\Component;
  */
 class GameShow extends Component
 {
+    use EditsActionsLive;
     use InteractsWithClub;
 
     #[Locked]
@@ -64,6 +66,8 @@ class GameShow extends Component
         return [
             'echo-private:games.'.$this->game->id.',.actions.recorded' => 'onActionsRecorded',
             'echo-private:games.'.$this->game->id.',.analysis.updated' => 'onAnalysisUpdated',
+            // the point-by-point tab corrected something: the box score re-renders with it
+            'rallies-changed' => '$refresh',
         ];
     }
 
@@ -179,6 +183,8 @@ class GameShow extends Component
         if (in_array($grade, ['#', '='], true) && $skill !== Skill::Reception->value) {
             $this->rally++;
         }
+
+        $this->dispatch('stats-refreshed');
     }
 
     /**
@@ -204,8 +210,9 @@ class GameShow extends Component
 
     /**
      * The analyst clarifies an action: optionally sets who did it and the grade, then confirms it.
+     * An action the AI could not place in the video takes the player's current time ($time).
      */
-    public function resolveAction(int $actionId, ?int $playerId = null, ?string $grade = null): void
+    public function resolveAction(int $actionId, ?int $playerId = null, ?string $grade = null, ?float $time = null): void
     {
         Gate::authorize('code', $this->game);
 
@@ -220,8 +227,13 @@ class GameShow extends Component
             $action->grade = Grade::from($grade);
         }
 
+        if ($time !== null && $action->video_time === null && $time >= 0) {
+            $action->video_time = round($time, 2);
+        }
+
         $action->fill(['needs_review' => false, 'reviewed_at' => now()])->save();
         GameActionsRecorded::dispatch($this->game, 0, 1, 0, [$action->toBroadcast()]);
+        $this->dispatch('stats-refreshed');
     }
 
     /**
@@ -236,6 +248,7 @@ class GameShow extends Component
             'needs_review' => true,
             'review_note' => $note !== '' ? $note : null,
         ]);
+        $this->dispatch('stats-refreshed');
     }
 
     /**
@@ -375,6 +388,7 @@ class GameShow extends Component
 
         $action = $this->game->actions()->findOrFail($actionId);
         $ingestor->delete($action);
+        $this->dispatch('stats-refreshed');
         $this->toast(__('Action deleted.'));
     }
 
@@ -429,6 +443,11 @@ class GameShow extends Component
         $this->toast(__('Lineup saved.'));
     }
 
+    protected function actionsChanged(): void
+    {
+        $this->dispatch('stats-refreshed');
+    }
+
     public function reanalyze(): void
     {
         Gate::authorize('update', $this->game);
@@ -456,6 +475,18 @@ class GameShow extends Component
                 ->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
                 ->when($visible !== null, fn ($q) => $q->whereIn('player_id', $visible))
                 ->latest('id')->limit(40)->get(),
+            'recent' => $canCode
+                ? $game->actions()->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
+                    ->whereHas('set', fn ($q) => $q->where('number', $this->codingSet))
+                    ->latest('id')->limit(8)->get()
+                : collect(),
+            'codes' => $canCode ? [
+                'roster' => Player::query()->forClub($game->club_id)->where('team_id', $game->team_id)
+                    ->orderByRaw('number is null')->orderBy('number')->get()
+                    ->map(fn (Player $p) => ['id' => $p->id, 'label' => trim($p->numberLabel().($p->isAnonymous() ? '' : ' '.$p->short_name))])
+                    ->values()->all(),
+                'skills' => collect(Skill::cases())->map(fn (Skill $s) => ['value' => $s->value, 'label' => $s->label()])->all(),
+            ] : null,
             'review' => $canCode
                 ? $game->actions()->with(['player:id,number,first_name,last_name,nickname', 'set:id,number'])
                     ->where('needs_review', true)->orderBy('video_time')->orderBy('id')->limit(50)->get()
