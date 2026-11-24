@@ -132,6 +132,10 @@ try {
     & $vpy -m pip install --upgrade --no-cache-dir "$(Join-Path $AppDir 'app')[vision,tray]"
     if ($LASTEXITCODE -ne 0) { throw 'Instalacja VVA Analyzer nie powiodła się.' }
 
+    Step 'Instaluję śledzenie zawodników (BoT-SORT + re-ID)'
+    & $vpy -m pip install --upgrade --no-cache-dir "$(Join-Path $AppDir 'app')[tracking]"
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Śledzenie BoT-SORT pominięte: zostaje prostszy tracker.' -ForegroundColor Yellow }
+
     Step 'Pobieram modele AI (wykrywanie piłki i odczyt wyniku)'
     $data = Join-Path $env:APPDATA 'VVA Analyzer'
     New-Item -ItemType Directory -Force -Path $data | Out-Null

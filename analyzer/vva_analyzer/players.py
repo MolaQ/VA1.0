@@ -39,6 +39,7 @@ class Person:
 
     `num` / `num_conf`: jersey number read from the torso (jersey.py), when it was tried.
     `sig`: how the player looks (appearance.py), taken now and then.
+    `tid`: the id BoT-SORT gave this box (reid.py); the tracks then follow it instead of distance.
     """
 
     x: float
@@ -49,6 +50,7 @@ class Person:
     num: int | None = None
     num_conf: float = 0.0
     sig: list[float] | None = None  # look: shoes + head colours (appearance.py)
+    tid: int | None = None  # BoT-SORT track id on every frame (reid.py), when it ran
 
 
 @dataclass
@@ -88,6 +90,8 @@ class Tracker:
     min_speed_facing: float = 0.8  # m/s; slower than this keeps the previous facing
     tracks: list[Track] = field(default_factory=list)
     next_id: int = 1
+    epoch: int = 0
+    by_id: dict[tuple[int, int], Track] = field(default_factory=dict)
 
     def update(self, t: float, points: list) -> list[Track]:
         """`points`: (x, y) or (x, y, person) in court metres. Returns the tracks seen now;
@@ -129,6 +133,32 @@ class Tracker:
             self.tracks.append(tr)
             seen.append((tr, person(i)))
         return seen
+
+    def follow(self, t: float, points: list) -> list[tuple[Track, "Person | None"]]:
+        """Like `match`, but the people carry a BoT-SORT id: keep one track per id.
+
+        Ids are given new track numbers after `restart()` (a replay), so a player seen again
+        after a replay is not joined to the old dot by an id BoT-SORT kept through the replay."""
+        seen: list[tuple[Track, Person | None]] = []
+        for x, y, *rest in points:
+            p = rest[0] if rest else None
+            if p is None or p.tid is None:
+                continue  # BoT-SORT did not confirm this box yet
+            key = (self.epoch, p.tid)
+            tr = self.by_id.get(key)
+            if tr is None:
+                tr = Track(self.next_id, x, y, t, facing=_towards_net(y))
+                self.next_id += 1
+                self.by_id[key] = tr
+            else:
+                self._move(tr, t, x, y)
+            tr.vote(p)
+            seen.append((tr, p))
+        return seen
+
+    def restart(self) -> None:
+        self.tracks.clear()
+        self.epoch += 1
 
     def _move(self, tr: Track, t: float, x: float, y: float) -> None:
         dt = max(1e-3, t - tr.t)
@@ -230,12 +260,19 @@ def track_players(
     out: list[tuple[float, list[Seen]]] = []
     tracks: dict[int, Track] = {}
     replays = replays or []
+    # BoT-SORT ids from the scan (reid.py) are better than joining dots by distance
+    by_id = any(p.tid is not None for _, people in samples for p in people)
+    in_replay = False
     for t, people in sorted(samples, key=lambda s: s[0]):
         if any(a <= t <= b for a, b in replays):
-            tracker.tracks.clear()  # a replay shows another camera angle: start the tracks again
+            if not in_replay:
+                tracker.restart()  # a replay shows another camera angle: start the tracks again
+            in_replay = True
             continue
+        in_replay = False
         seen = []
-        for tr, person in tracker.match(t, to_court_points(h, people)):
+        points = to_court_points(h, people)
+        for tr, person in (tracker.follow(t, points) if by_id else tracker.match(t, points)):
             tracks[tr.id] = tr
             seen.append(Seen(tr.id, round(tr.x, 2), round(tr.y, 2), tr.facing, person))
         if seen:

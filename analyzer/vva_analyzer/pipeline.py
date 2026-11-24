@@ -33,6 +33,8 @@ class Job:
         self.roster: set[int] = set()  # our jersey numbers
         self.team_id: int | None = None
         self.looks: dict[int, dict] = {}  # jersey number -> learned look (appearance.py)
+        self.gallery: dict[int, dict] = {}  # jersey number -> learned re-ID fingerprint (reid.py)
+        self.prints: dict[int, dict] = {}  # BoT-SORT track id -> mean fingerprint of this video
         self.on_progress = on_progress or (lambda p, m: log.info("%3d%% %s", p, m))
         self.obs: list[ral.BallObs] = []
         self.readings: list[Reading] = []
@@ -56,8 +58,9 @@ class Job:
 
         if self.client and self.game_id:
             self._load_lineups()
-        from . import appearance
+        from . import appearance, reid
         self.looks = appearance.load(self.looks_file())
+        self.gallery = reid.load(self.looks_file("reid"))
 
         cache = self.workdir / f"{video.stem}.detections.json"
         if reuse and cache.exists():
@@ -82,6 +85,9 @@ class Job:
         if getattr(self, "learned", None):
             from . import appearance
             appearance.save(self.looks_file(), self.learned)
+        if getattr(self, "learned_prints", None):
+            from . import reid
+            reid.save(self.looks_file("reid"), self.learned_prints)
         report_path = self.workdir / f"{video.stem}.report.json"
         report_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
         log.info("report: %s", report_path)
@@ -114,13 +120,30 @@ class Job:
                 jerseys = JerseyReader(ocr.reader if ocr else None, gpu=self.device not in (None, "cpu"))
             except Exception as e:  # numbers are extra: positions still work without OCR
                 log.warning("jersey numbers off: %s", e)
+        follower = None
+        if want_people and self.s.tracker == "botsort":
+            from . import reid
+            if reid.available():
+                try:
+                    follower = reid.ReidTracker(self.device, self.s.reid_model, self.s.sample_fps)
+                except Exception as e:  # the simple tracker still works
+                    log.warning("BoT-SORT off: %s", e)
+            else:
+                log.info("BoxMOT not installed (pip install .[tracking]): simple tracker")
+        court_h = homography(self.cal.court, 1, 1, self.cal.court_ref) if want_people else None
         last_pct = -1
         last_publish = 0
 
         def flush():
             for t, frame, (found, persons) in zip(times, batch, detector.detect_all(batch, people=want_people)):
-                if want_people and t >= next_pos[0]:
-                    people = [Person(x, y, c, w_, h_) for x, y, c, w_, h_ in persons]
+                keep = want_people and t >= next_pos[0]
+                people = [Person(x, y, c, w_, h_) for x, y, c, w_, h_ in persons] if want_people else []
+                if follower is not None:
+                    try:
+                        follower.update(frame, people, court_h, keep=keep)  # every frame: ids stay stable
+                    except Exception as e:
+                        log.debug("BoT-SORT frame skipped: %s", e)
+                if keep:
                     if t >= next_num[0]:
                         if jerseys:
                             jerseys.read(frame, people)
@@ -163,6 +186,8 @@ class Job:
                         log.warning("partial publish failed: %s", e)
         if batch:
             flush()
+        if follower is not None:
+            self.prints = follower.fingerprints()
 
     def _rehalf(self) -> None:
         """Court half of every ball position from the current calibration (coordinates are normalised)."""
@@ -210,8 +235,11 @@ class Job:
         if tracking is not None and self.lineups:
             from .rotation import rotation_votes
             rotation_matches = rotation_votes(rallies, tracking, self.lineups, self.cal.our_side_set1, self.liberos, self.middles)
+        reid_matched = 0
         if tracking is not None:
-            looks_matched = self._appearance(tracking, sets)
+            ours = self._ours(tracking, sets)
+            reid_matched = self._reid(tracking, ours)
+            looks_matched = self._appearance(tracking, ours)
         frames = self.player_frames(sets, tracking)
         receptions, serve_extra = [], {}
         if tracking is not None:
@@ -237,6 +265,7 @@ class Job:
                 "numbered_tracks": len(tracking.numbers) if tracking else 0,
                 "rotation_matches": rotation_matches,
                 "looks_matched": looks_matched,
+                "reid_matched": reid_matched,
                 "receptions": len(receptions),
                 "serves_with_point": len(serve_extra),
             },
@@ -251,19 +280,36 @@ class Job:
         h = homography(self.cal.court, 1, 1, self.cal.court_ref)
         return track_players(self.people, h, replays)
 
-    def _appearance(self, tracking, sets) -> int:
-        """Learn the look of every numbered player of ours, then name our unnamed tracks by look."""
-        from . import appearance
-        from .court import homography
+    def _ours(self, tracking, sets) -> set[int]:
+        """Track ids of our team: on our half for most of the time they were seen."""
         from .players import team_of
 
-        h = homography(self.cal.court, 1, 1, self.cal.court_ref)
         starts = [(x.number, x.video_start) for x in sets if x.video_start is not None]
         side: dict[int, list[str]] = {}
         for t, seen in tracking.samples:
             for s in seen:
                 side.setdefault(s.track, []).append(team_of(s.y, t, starts, self.cal.our_side_set1))
-        ours = {k for k, v in side.items() if v.count("us") * 2 > len(v)}
+        return {k for k, v in side.items() if v.count("us") * 2 > len(v)}
+
+    def _reid(self, tracking, ours: set[int]) -> int:
+        """Learn the re-ID fingerprint of every numbered player of ours, then name unnamed tracks by it."""
+        if not self.prints:
+            return 0
+        from . import reid
+
+        prints = reid.track_fingerprints(tracking, self.prints)
+        mine = {k: n for k, n in tracking.numbers.items() if k in ours and (not self.roster or n in self.roster)}
+        known = reid.learn(prints, mine, self.gallery)
+        matched = reid.reid_votes(tracking, prints, known, self.roster or None, ours)
+        self.learned_prints = known
+        return matched
+
+    def _appearance(self, tracking, ours: set[int]) -> int:
+        """Learn the look of every numbered player of ours, then name our unnamed tracks by look."""
+        from . import appearance
+        from .court import homography
+
+        h = homography(self.cal.court, 1, 1, self.cal.court_ref)
         looks = appearance.track_looks(tracking, h)
         mine = {k: n for k, n in tracking.numbers.items() if k in ours and (not self.roster or n in self.roster)}
         known = appearance.learn(looks, mine, self.looks)
@@ -271,8 +317,8 @@ class Job:
         self.learned = known  # learned only from numbers that did not come from the looks themselves
         return matched
 
-    def looks_file(self) -> Path:
-        return self.workdir / (f"looks-team{self.team_id}.json" if self.team_id else "looks.json")
+    def looks_file(self, kind: str = "looks") -> Path:
+        return self.workdir / (f"{kind}-team{self.team_id}.json" if self.team_id else f"{kind}.json")
 
     def player_frames(self, sets, tracking) -> list[dict]:
         """Player positions in court metres for the 2D view."""
@@ -331,8 +377,9 @@ class Job:
         data = {
             "obs": [[o.t, o.x, o.y, o.conf, o.half] for o in self.obs],
             "readings": [[r.t, r.left, r.right, int(r.replay)] for r in self.readings],
-            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2), round(p.w, 4), round(p.h, 4), p.num, round(p.num_conf, 2), p.sig]
+            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2), round(p.w, 4), round(p.h, 4), p.num, round(p.num_conf, 2), p.sig, p.tid]
                             for p in ps]] for t, ps in self.people],
+            "prints": {str(k): v for k, v in self.prints.items()},
         }
         path.write_text(json.dumps(data), encoding="utf-8")
 
@@ -341,6 +388,7 @@ class Job:
         self.obs = [ral.BallObs(t, x, y, c, h) for t, x, y, c, h in data["obs"]]
         self.readings = [Reading(r[0], r[1], r[2], bool(r[3]) if len(r) > 3 else False) for r in data["readings"]]
         self.people = [(t, [Person(*p) for p in ps]) for t, ps in data.get("people", [])]
+        self.prints = {int(k): v for k, v in data.get("prints", {}).items()}
         self.replay_checked = not data["readings"] or len(data["readings"][0]) > 3
 
 
