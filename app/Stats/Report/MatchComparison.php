@@ -72,7 +72,7 @@ final class MatchComparison
                 }
 
                 foreach (array_keys($line->sets) as $set) {
-                    $this->players[$id]['total']->sets[$game->id.':'.$set] = true;
+                    $this->players[$id]['total']->sets[$game->id * 10 + $set] = true;
                 }
             }
         }
@@ -95,7 +95,7 @@ final class MatchComparison
             return null;
         }
 
-        $values = collect($this->matches)->except($latest->id)->map(fn (TeamTotals $t) => $t->kpis()[$kpi])->filter(fn ($v) => $v !== null);
+        $values = collect($this->matches)->except([$latest->id])->map(fn (TeamTotals $t) => $t->kpis()[$kpi])->filter(fn ($v) => $v !== null);
         $now = $this->matches[$latest->id]->kpis()[$kpi];
 
         return $now === null || $values->isEmpty() ? null : $now - (float) $values->avg();
