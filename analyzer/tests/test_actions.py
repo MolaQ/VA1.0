@@ -11,3 +11,8 @@ def test_only_our_serves_become_actions_with_stable_ids():
     out = serve_actions(rallies)
     assert [a["external_id"] for a in out] == ["s1-set1-r1-serve", "s1-set1-r2-serve"]
     assert out[1]["grade"] == "=" and out[1]["video_time"] == 40.0 and out[1]["meta"]["rally_won"] is False
+
+
+def test_serve_without_a_matched_play_gets_the_approximate_time():
+    out = serve_actions([Rally(1, 1, None, None, "us", "us", (0, 0), serve_grade="!", approx_time=125.5)])
+    assert out[0]["video_time"] == 125.5 and out[0]["meta"]["time_approx"] is True

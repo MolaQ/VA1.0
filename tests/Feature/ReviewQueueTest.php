@@ -100,3 +100,20 @@ it('picks clips by player, skill, grade and zone', function () {
         ->and($show->clips(null, 'serve', 'all', 5)[0]['t'])->toBe(40.0)
         ->and($show->clips(null, 'serve', 'all', 6))->toBeEmpty();
 });
+
+it('saves the video time when confirming an action the AI could not place in the video', function () {
+    ['club' => $club, 'game' => $game] = clubWithGame();
+    [$untimed, $timed] = app(ActionIngestor::class)->ingest($game, [
+        ['external_id' => 'srv-a', 'set' => 1, 'rally' => 1, 'skill' => 'serve', 'grade' => '!', 'confidence' => 0.4],
+        ['external_id' => 'srv-b', 'set' => 1, 'rally' => 2, 'skill' => 'serve', 'grade' => '!', 'video_time' => 50, 'confidence' => 0.4],
+    ], ActionSource::Ai)->actions->all();
+
+    Livewire::actingAs(member($club, Role::Trainer))
+        ->test(GameShow::class, ['game' => $game])
+        ->assertSee(__('No video time'))
+        ->call('resolveAction', $untimed->id, null, '!', 123.456)
+        ->call('resolveAction', $timed->id, null, '!', 999.0);
+
+    expect($untimed->fresh()->video_time)->toEqual(123.46)
+        ->and($timed->fresh()->video_time)->toEqual(50.0);
+});

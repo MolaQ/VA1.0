@@ -203,8 +203,9 @@ class GameShow extends Component
 
     /**
      * The analyst clarifies an action: optionally sets who did it and the grade, then confirms it.
+     * An action the AI could not place in the video takes the player's current time ($time).
      */
-    public function resolveAction(int $actionId, ?int $playerId = null, ?string $grade = null): void
+    public function resolveAction(int $actionId, ?int $playerId = null, ?string $grade = null, ?float $time = null): void
     {
         Gate::authorize('code', $this->game);
 
@@ -217,6 +218,10 @@ class GameShow extends Component
 
         if ($grade !== null) {
             $action->grade = Grade::from($grade);
+        }
+
+        if ($time !== null && $action->video_time === null && $time >= 0) {
+            $action->video_time = round($time, 2);
         }
 
         $action->fill(['needs_review' => false, 'reviewed_at' => now()])->save();

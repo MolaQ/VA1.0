@@ -264,8 +264,8 @@
                         @foreach ($review as $a)
                             <li wire:key="rv-{{ $a->id }}" x-data="{ pid: @js($a->player_id), grade: @js($a->grade->value) }" class="space-y-2 rounded-xl px-3 py-2.5">
                                 <div class="flex items-center gap-2">
-                                    <button type="button" class="flex min-w-0 flex-1 items-center gap-2 text-left text-sm" @if ($a->video_time !== null) x-on:click="jump({{ $a->video_time }})" title="{{ __('Jump to this moment') }}" @endif>
-                                        <x-icon name="play" class="size-4 shrink-0 text-brand-400" />
+                                    <button type="button" class="flex min-w-0 flex-1 items-center gap-2 text-left text-sm" @if ($a->video_time !== null) x-on:click="jump({{ $a->video_time }})" title="{{ __('Jump to this moment') }}" @else disabled title="{{ __('No video time') }}" @endif>
+                                        <x-icon :name="$a->video_time !== null ? 'play' : 'clock'" @class(['size-4 shrink-0', 'text-brand-400' => $a->video_time !== null, 'text-subtle' => $a->video_time === null]) />
                                         <span class="w-11 shrink-0 text-xs tabular text-muted">{{ \App\Support\YouTube::formatTime($a->video_time) }}</span>
                                         <x-jersey :player="$a->player" />
                                         <span class="truncate">{{ $a->skill->label() }} {{ $a->grade->value }}</span>
@@ -273,6 +273,9 @@
                                     @if ($a->set)<span class="text-xs text-subtle">S{{ $a->set->number }}</span>@endif
                                 </div>
                                 <p class="text-xs text-warning-400">{{ $a->reviewReason() }}</p>
+                                @if ($a->video_time === null)
+                                    <p class="text-xs text-muted">{{ __('No video time: find this moment in the video, then confirm and the current video time is saved with it.') }}</p>
+                                @endif
                                 <div class="flex flex-wrap items-center gap-1.5">
                                     <select x-model.number="pid" class="input !w-auto !px-2 !py-1 text-sm tabular" aria-label="{{ __('Player') }}">
                                         <option value="">?</option>
@@ -283,7 +286,7 @@
                                     <select x-model="grade" class="input !w-auto !px-2 !py-1 text-sm" aria-label="{{ __('Grade') }}">
                                         @foreach ($grades as $g)<option value="{{ $g->value }}">{{ $g->value }}</option>@endforeach
                                     </select>
-                                    <x-ui.button size="sm" icon="check" x-on:click="$wire.resolveAction({{ $a->id }}, pid || null, grade)">{{ __('Confirm') }}</x-ui.button>
+                                    <x-ui.button size="sm" icon="check" x-on:click="$wire.resolveAction({{ $a->id }}, pid || null, grade{{ $a->video_time === null ? ', currentTime()' : '' }})">{{ __('Confirm') }}</x-ui.button>
                                     <button type="button" wire:click="deleteAction({{ $a->id }})" wire:confirm="{{ __('Delete this action?') }}" class="rounded-lg p-1 text-subtle hover:text-danger-400" aria-label="{{ __('Delete') }}"><x-icon name="trash" class="size-4" /></button>
                                 </div>
                             </li>

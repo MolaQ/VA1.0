@@ -556,5 +556,7 @@
     "match": "mecz",
     "Compare matches": "Porównaj mecze",
     "Metric": "Wskaźnik",
-    "Coding": "Kodowanie"
+    "Coding": "Kodowanie",
+    "No video time": "Brak czasu w nagraniu",
+    "No video time: find this moment in the video, then confirm and the current video time is saved with it.": "Brak czasu w nagraniu: znajdź ten moment na wideo i zatwierdź, a zapisze się aktualny czas odtwarzacza."
 }
