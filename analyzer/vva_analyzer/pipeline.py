@@ -27,6 +27,8 @@ class Job:
         self.client, self.game_id, self.device = client, game_id, device
         self.lineups: dict[int, list[int | None]] = {}  # set -> numbers in rotation positions I..VI
         self.first_serve: dict[int, bool] = {}
+        self.liberos: dict[int, tuple[int | None, int | None]] = {}  # set -> (reception, defence) numbers
+        self.middles: set[int] = set()  # jersey numbers of our middle blockers
         self.on_progress = on_progress or (lambda p, m: log.info("%3d%% %s", p, m))
         self.obs: list[ral.BallObs] = []
         self.readings: list[Reading] = []
@@ -184,6 +186,10 @@ class Job:
         rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1, self.first_serve)
         numbered = ral.assign_servers(rallies, self.lineups)
         tracking = self.tracking(spans)
+        rotation_matches = 0
+        if tracking is not None and self.lineups:
+            from .rotation import rotation_votes
+            rotation_matches = rotation_votes(rallies, tracking, self.lineups, self.cal.our_side_set1, self.liberos, self.middles)
         frames = self.player_frames(sets, tracking)
         receptions, serve_extra = [], {}
         if tracking is not None:
@@ -207,6 +213,7 @@ class Job:
                 "rallies_with_video_time": sum(1 for r in rallies if r.start is not None),
                 "position_frames": len(frames),
                 "numbered_tracks": len(tracking.numbers) if tracking else 0,
+                "rotation_matches": rotation_matches,
                 "receptions": len(receptions),
                 "serves_with_point": len(serve_extra),
             },
@@ -260,9 +267,12 @@ class Job:
             n = int(st["number"])
             if st.get("we_serve_first") is not None:
                 self.first_serve[n] = bool(st["we_serve_first"])
+            if st.get("libero_reception") is not None or st.get("libero_defense") is not None:
+                self.liberos[n] = (st.get("libero_reception"), st.get("libero_defense"))
             by_pos = {int(e["rotation_position"]): e.get("number") for e in st.get("lineup", [])}
             if by_pos:
                 self.lineups[n] = [by_pos.get(p) for p in range(1, 7)]
+        self.middles = {int(p["number"]) for p in game.get("roster", []) if p.get("position") == "middle" and p.get("number") is not None}
         if self.lineups:
             log.info("ustawienia z VVA / lineups: %s", {k: v for k, v in sorted(self.lineups.items())})
 

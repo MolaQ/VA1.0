@@ -16,9 +16,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property float|null $video_start
  * @property bool|null $we_serve_first
  * @property string|null $our_side near | far: the half of the camera picture we defend
+ * @property int|null $libero_reception_id libero on the court when we receive
+ * @property int|null $libero_defense_id libero on the court when we serve
  * @property-read Game $game
  */
-#[Fillable(['game_id', 'number', 'score_us', 'score_them', 'video_start', 'we_serve_first', 'our_side'])]
+#[Fillable(['game_id', 'number', 'score_us', 'score_them', 'video_start', 'we_serve_first', 'our_side', 'libero_reception_id', 'libero_defense_id'])]
 class GameSet extends Model
 {
     protected function casts(): array

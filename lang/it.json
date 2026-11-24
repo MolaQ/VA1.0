@@ -555,5 +555,11 @@
     "Value per set": "Valore a set",
     "match": "partita",
     "Compare matches": "Confronta partite",
-    "Metric": "Indicatore"
+    "Metric": "Indicatore",
+    "Live (beta)": "Dal vivo (beta)",
+    "we serve": "battiamo noi",
+    "we receive": "riceviamo",
+    "No rotation yet: enter the starting lineup of the set below.": "Nessuna rotazione: inserisci sotto la formazione iniziale del set.",
+    "Libero (reception)": "Libero (ricezione)",
+    "Libero (defence)": "Libero (difesa)"
 }

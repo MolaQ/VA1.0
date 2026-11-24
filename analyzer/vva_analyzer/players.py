@@ -195,7 +195,20 @@ class Seen:
 @dataclass
 class Tracking:
     samples: list[tuple[float, list[Seen]]]
-    numbers: dict[int, int]  # track id -> jersey number agreed by the OCR reads
+    numbers: dict[int, int]  # track id -> jersey number agreed by the reads (OCR, rotations)
+    tracks: dict[int, Track] = field(default_factory=dict)
+
+    def vote(self, track: int, number: int, weight: float) -> None:
+        """An extra read for a track (e.g. from the rotation at the serve), then re-agree its number."""
+        tr = self.tracks.get(track)
+        if tr is None:
+            return
+        tr.vote(Person(0, 0, num=number, num_conf=weight))
+        n = tr.number()
+        if n is None:
+            self.numbers.pop(track, None)
+        else:
+            self.numbers[track] = n
 
     def at(self, t: float, within: float = 0.6) -> list[Seen]:
         """Players at the sample nearest to t."""
@@ -226,7 +239,7 @@ def track_players(
         if seen:
             out.append((t, seen))
     numbers = {k: n for k, tr in tracks.items() if (n := tr.number()) is not None}
-    return Tracking(out, numbers)
+    return Tracking(out, numbers, tracks)
 
 
 def build_frames(

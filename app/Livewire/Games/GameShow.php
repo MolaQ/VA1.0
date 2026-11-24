@@ -17,6 +17,7 @@ use App\Models\Player;
 use App\Services\ActionIngestor;
 use App\Stats\GameStatsCalculator;
 use App\Stats\PassQuality;
+use App\Stats\RotationTimeline;
 use App\Support\Visibility;
 use App\Support\YouTube;
 use Illuminate\Contracts\View\View;
@@ -257,6 +258,18 @@ class GameShow extends Component
     }
 
     /**
+     * Who stands in which zone at every rally (lineup + side-outs + liberos), for the 2D court.
+     *
+     * @return array{players: array<int, array{n: int|null, name: string, libero: bool}>, rallies: list<array<string, mixed>>}
+     */
+    public function rotations(RotationTimeline $timeline): array
+    {
+        $this->game->unsetRelation('sets')->unsetRelation('rallies');
+
+        return $timeline->build($this->game);
+    }
+
+    /**
      * Positions are automatic; when the AI lost a jersey number or is unsure, the analyst
      * gives the number (and team) to the analyzer track: every frame of it shows the number.
      */
@@ -382,18 +395,22 @@ class GameShow extends Component
      *
      * @param  array<int|string, int|string|null>  $positions  rotation position (1-6) => player id
      */
-    public function saveLineup(int $number, array $positions, ?string $firstServe = null): void
+    public function saveLineup(int $number, array $positions, ?string $firstServe = null, ?int $liberoReception = null, ?int $liberoDefense = null): void
     {
         Gate::authorize('update', $this->game);
         abort_unless($number >= 1 && $number <= 5, 404);
 
         $roster = Player::query()->forClub($this->game->club_id)->pluck('id')->all();
         $set = $this->game->sets()->firstOrCreate(['number' => $number]);
-        $set->update(['we_serve_first' => match ($firstServe) {
-            'us' => true,
-            'them' => false,
-            default => null,
-        }]);
+        $set->update([
+            'we_serve_first' => match ($firstServe) {
+                'us' => true,
+                'them' => false,
+                default => null,
+            },
+            'libero_reception_id' => in_array($liberoReception, $roster, true) ? $liberoReception : null,
+            'libero_defense_id' => in_array($liberoDefense, $roster, true) ? $liberoDefense : null,
+        ]);
 
         $chosen = collect($positions)
             ->mapWithKeys(fn ($playerId, $pos) => [(int) $pos => (int) $playerId])
