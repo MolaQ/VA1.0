@@ -308,7 +308,7 @@
                         $byPos = $set ? $set->lineups->whereNotNull('rotation_position')->pluck('player_id', 'rotation_position')->all() : [];
                         $first = $set?->we_serve_first === null ? '' : ($set->we_serve_first ? 'us' : 'them');
                     @endphp
-                    <div x-data="{ pos: @js((object) $byPos), first: @js($first) }" wire:key="lineup-{{ $i }}" class="rounded-xl border border-line bg-surface-2 p-3">
+                    <div x-data="{ pos: @js((object) $byPos), first: @js($first), lr: @js($set?->libero_reception_id), ld: @js($set?->libero_defense_id) }" wire:key="lineup-{{ $i }}" class="rounded-xl border border-line bg-surface-2 p-3">
                         <p class="label">Set {{ $i }}</p>
                         <div class="grid grid-cols-3 gap-1.5">
                             {{-- court layout as seen from behind our end line: IV III II / V VI I --}}
@@ -332,7 +332,21 @@
                                 <option value="them">{{ __('Opponent') }}</option>
                             </select>
                         </label>
-                        <button type="button" x-on:click="$wire.saveLineup({{ $i }}, pos, first || null)" class="mt-2 w-full rounded-lg py-1 text-xs font-semibold text-brand-400 hover:bg-brand-500/10">{{ __('Save') }}</button>
+                        @php $liberos = $roster->filter(fn ($pl) => $pl->isLibero()); @endphp
+                        <div class="mt-2 grid grid-cols-2 gap-1.5">
+                            @foreach (['lr' => __('Libero (reception)'), 'ld' => __('Libero (defence)')] as $key => $label)
+                                <label class="block">
+                                    <span class="text-[10px] font-semibold uppercase text-muted">{{ $label }}</span>
+                                    <select x-model.number="{{ $key }}" class="input !px-1.5 !py-1 text-sm tabular">
+                                        <option value="">–</option>
+                                        @foreach ($liberos->isNotEmpty() ? $liberos : $roster as $pl)
+                                            <option value="{{ $pl->id }}">{{ $pl->numberLabel() }}{{ $pl->isAnonymous() ? '' : ' '.$pl->short_name }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @endforeach
+                        </div>
+                        <button type="button" x-on:click="$wire.saveLineup({{ $i }}, pos, first || null, lr || null, ld || null)" class="mt-2 w-full rounded-lg py-1 text-xs font-semibold text-brand-400 hover:bg-brand-500/10">{{ __('Save') }}</button>
                     </div>
                 @endfor
             </div>

@@ -341,8 +341,29 @@
     opacity: 0.9;
 }
 
+.court-dot-glide {
+    transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.court-dot-live {
+    transition: transform 0.3s linear;
+}
+
+.court-dot-turn {
+    transition: transform 0.4s ease;
+}
+
 .court-dot-us {
     --dot: var(--court-us);
+}
+
+.court-dot-us.court-dot-libero {
+    --dot: var(--color-volley-500);
+}
+
+.court-dot-serving .court-dot-body {
+    stroke: var(--color-success-500);
+    stroke-width: 0.12;
 }
 
 .court-dot-them {

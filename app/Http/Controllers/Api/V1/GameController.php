@@ -30,6 +30,7 @@ class GameController extends Controller
     public static function payload(Game $game): array
     {
         $game->load(['team', 'sets.lineups.player']);
+        $roster = Player::query()->forClub($game->club_id)->get()->keyBy('id');
 
         return [
 
@@ -46,6 +47,9 @@ class GameController extends Controller
             ],
             'sets' => $game->sets->map(fn (GameSet $set) => [
                 ...$set->only(['number', 'score_us', 'score_them', 'video_start', 'we_serve_first', 'our_side']),
+                // jersey numbers of the libero on the court when we receive / when we serve
+                'libero_reception' => $roster->get((int) $set->libero_reception_id)?->number,
+                'libero_defense' => $roster->get((int) $set->libero_defense_id)?->number,
                 // starting rotation: position 1 (serves first) .. 6
                 'lineup' => $set->lineups->whereNotNull('rotation_position')->sortBy('rotation_position')
                     ->map(fn (SetLineup $l) => [
@@ -54,6 +58,8 @@ class GameController extends Controller
                         'number' => $l->player?->number,
                     ])->values(),
             ])->values(),
+            // jersey numbers the analyst gave to analyzer tracks (2D view): the analyzer learns from them
+            'tracks' => (object) $game->tracks()->whereNotNull('number')->pluck('number', 'track')->all(),
             'roster' => Player::query()->forClub($game->club_id)->where('team_id', $game->team_id)->get()
                 ->map(fn (Player $p) => [
                     'id' => $p->id,

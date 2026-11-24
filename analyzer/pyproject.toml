@@ -14,6 +14,8 @@ dependencies = [
 [project.optional-dependencies]
 # GPU detection + OCR (torch with CUDA is installed separately, see README).
 vision = ["ultralytics>=8.3", "easyocr>=1.7"]
+# BoT-SORT tracker + OSNet re-ID fingerprints (needs torch; pins opencv-python 4.11).
+tracking = ["boxmot>=26,<27"]
 server = ["fastapi>=0.110", "uvicorn>=0.29"]
 tray = ["pystray>=0.19", "pillow>=10"]
 dev = ["pytest>=8"]
