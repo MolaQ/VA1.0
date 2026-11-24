@@ -34,19 +34,19 @@ class VideoTimeShifter
 
         return DB::transaction(function () use ($game, $seconds) {
             $actions = $game->actions()->whereNotNull('video_time')
-                ->update(['video_time' => DB::raw('video_time + '.$seconds)]);
+                ->increment('video_time', $seconds);
             $untimed = $game->actions()->where('video_time', '<', 0)->update(['video_time' => null]);
 
             GameRally::query()->where('game_id', $game->id)->whereNotNull('video_time')
-                ->update(['video_time' => DB::raw('video_time + '.$seconds)]);
+                ->increment('video_time', $seconds);
             GameRally::query()->where('game_id', $game->id)->where('video_time', '<', 0)->update(['video_time' => null]);
 
-            GameSet::query()->where('game_id', $game->id)->whereNotNull('video_start')->update(['video_start' => DB::raw('video_start + '.$seconds)]);
+            GameSet::query()->where('game_id', $game->id)->whereNotNull('video_start')->increment('video_start', $seconds);
             GameSet::query()->where('game_id', $game->id)->where('video_start', '<', 0)->update(['video_start' => 0]);
 
             $game->frames()->where('t', '<', -$seconds)->delete();
-            $frames = $game->frames()->update(['t' => DB::raw('t + '.($seconds + self::PARK))]);
-            $game->frames()->update(['t' => DB::raw('t - '.self::PARK)]);
+            $frames = $game->frames()->increment('t', $seconds + self::PARK);
+            $game->frames()->decrement('t', self::PARK);
 
             return ['actions' => $actions, 'frames' => $frames, 'untimed' => $untimed];
         });
