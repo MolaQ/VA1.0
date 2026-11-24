@@ -100,15 +100,15 @@ it('creates, renames and deletes a team', function () {
     $admin = member($club, Role::Admin);
 
     Livewire::actingAs($admin)->test(Teams::class)
-        ->set('name', 'Juniorzy')->set('category', 'U19')
+        ->set('name', 'Rezerwy')->set('category', 'U19')
         ->call('save')->assertHasNoErrors();
 
-    $team = $club->teams()->where('name', 'Juniorzy')->sole();
+    $team = $club->teams()->where('name', 'Rezerwy')->sole();
     $player = Player::factory()->for($club)->for($team)->create(['number' => 5]);
 
     Livewire::actingAs($admin)->test(Teams::class)
-        ->call('edit', $team->id)->set('name', 'Juniorzy A')->call('save');
-    expect($team->fresh()->name)->toBe('Juniorzy A');
+        ->call('edit', $team->id)->set('name', 'Rezerwy A')->call('save');
+    expect($team->fresh()->name)->toBe('Rezerwy A');
 
     Livewire::actingAs($admin)->test(Teams::class)->call('delete', $team->id);
     expect(Team::query()->find($team->id))->toBeNull()
