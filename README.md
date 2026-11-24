@@ -19,6 +19,12 @@ Konta demo (hasło `password`): `admin@vva.test`, `trener@vva.test`, `zawodnik@v
 `rodzic@vva.test` (widzi tylko dziecko – libero #26), `super@vva.test` (właściciel platformy).
 Drugi klub (`trener@sokol.test`) pokazuje izolację danych między klubami.
 
+## Serwer domowy (produkcja)
+
+Docker Compose + jeden skrypt: `cd deploy && ./vva.sh install`. Instrukcja krok po kroku
+(Windows/WSL2 lub Linux, Cloudflare Tunnel lub własny HTTPS, kopie zapasowe, GPU) w
+[`deploy/README.md`](deploy/README.md).
+
 ## Architektura
 
 | Obszar | Gdzie |
