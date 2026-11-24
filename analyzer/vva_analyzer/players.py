@@ -38,6 +38,7 @@ class Person:
     """A person box seen in the image: feet point (bottom centre) and box size, normalised 0..1.
 
     `num` / `num_conf`: jersey number read from the torso (jersey.py), when it was tried.
+    `sig`: how the player looks (appearance.py), taken now and then.
     """
 
     x: float
@@ -47,6 +48,7 @@ class Person:
     h: float = 0.0
     num: int | None = None
     num_conf: float = 0.0
+    sig: list[float] | None = None  # look: shoes + head colours (appearance.py)
 
 
 @dataclass

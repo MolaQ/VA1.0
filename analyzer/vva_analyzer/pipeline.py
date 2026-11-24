@@ -29,6 +29,10 @@ class Job:
         self.first_serve: dict[int, bool] = {}
         self.liberos: dict[int, tuple[int | None, int | None]] = {}  # set -> (reception, defence) numbers
         self.middles: set[int] = set()  # jersey numbers of our middle blockers
+        self.labels: dict[int, int] = {}  # analyzer track -> jersey number the analyst gave (2D view)
+        self.roster: set[int] = set()  # our jersey numbers
+        self.team_id: int | None = None
+        self.looks: dict[int, dict] = {}  # jersey number -> learned look (appearance.py)
         self.on_progress = on_progress or (lambda p, m: log.info("%3d%% %s", p, m))
         self.obs: list[ral.BallObs] = []
         self.readings: list[Reading] = []
@@ -52,6 +56,8 @@ class Job:
 
         if self.client and self.game_id:
             self._load_lineups()
+        from . import appearance
+        self.looks = appearance.load(self.looks_file())
 
         cache = self.workdir / f"{video.stem}.detections.json"
         if reuse and cache.exists():
@@ -73,6 +79,9 @@ class Job:
             log.warning("whistle detection skipped: %s", e)
 
         result = self.analyse()
+        if getattr(self, "learned", None):
+            from . import appearance
+            appearance.save(self.looks_file(), self.learned)
         report_path = self.workdir / f"{video.stem}.report.json"
         report_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
         log.info("report: %s", report_path)
@@ -112,8 +121,15 @@ class Job:
             for t, frame, (found, persons) in zip(times, batch, detector.detect_all(batch, people=want_people)):
                 if want_people and t >= next_pos[0]:
                     people = [Person(x, y, c, w_, h_) for x, y, c, w_, h_ in persons]
-                    if jerseys and t >= next_num[0]:
-                        jerseys.read(frame, people)
+                    if t >= next_num[0]:
+                        if jerseys:
+                            jerseys.read(frame, people)
+                        try:
+                            from .appearance import signature
+                            for person in people:
+                                person.sig = signature(frame, person)
+                        except Exception as e:  # looks are extra
+                            log.debug("no signature: %s", e)
                         next_num[0] = t + self.s.jersey_every_s
                     self.people.append((t, people))
                     next_pos[0] = t + self.s.positions_every_s
@@ -186,10 +202,16 @@ class Job:
         rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1, self.first_serve)
         numbered = ral.assign_servers(rallies, self.lineups)
         tracking = self.tracking(spans)
-        rotation_matches = 0
+        rotation_matches = looks_matched = 0
+        if tracking is not None:
+            for track, n in self.labels.items():  # the analyst's corrections weigh most
+                for _ in range(3):
+                    tracking.vote(track, n, 1.0)
         if tracking is not None and self.lineups:
             from .rotation import rotation_votes
             rotation_matches = rotation_votes(rallies, tracking, self.lineups, self.cal.our_side_set1, self.liberos, self.middles)
+        if tracking is not None:
+            looks_matched = self._appearance(tracking, sets)
         frames = self.player_frames(sets, tracking)
         receptions, serve_extra = [], {}
         if tracking is not None:
@@ -214,6 +236,7 @@ class Job:
                 "position_frames": len(frames),
                 "numbered_tracks": len(tracking.numbers) if tracking else 0,
                 "rotation_matches": rotation_matches,
+                "looks_matched": looks_matched,
                 "receptions": len(receptions),
                 "serves_with_point": len(serve_extra),
             },
@@ -227,6 +250,29 @@ class Job:
 
         h = homography(self.cal.court, 1, 1, self.cal.court_ref)
         return track_players(self.people, h, replays)
+
+    def _appearance(self, tracking, sets) -> int:
+        """Learn the look of every numbered player of ours, then name our unnamed tracks by look."""
+        from . import appearance
+        from .court import homography
+        from .players import team_of
+
+        h = homography(self.cal.court, 1, 1, self.cal.court_ref)
+        starts = [(x.number, x.video_start) for x in sets if x.video_start is not None]
+        side: dict[int, list[str]] = {}
+        for t, seen in tracking.samples:
+            for s in seen:
+                side.setdefault(s.track, []).append(team_of(s.y, t, starts, self.cal.our_side_set1))
+        ours = {k for k, v in side.items() if v.count("us") * 2 > len(v)}
+        looks = appearance.track_looks(tracking, h)
+        mine = {k: n for k, n in tracking.numbers.items() if k in ours and (not self.roster or n in self.roster)}
+        known = appearance.learn(looks, mine, self.looks)
+        matched = appearance.appearance_votes(tracking, looks, known, self.roster or None, ours)
+        self.learned = known  # learned only from numbers that did not come from the looks themselves
+        return matched
+
+    def looks_file(self) -> Path:
+        return self.workdir / (f"looks-team{self.team_id}.json" if self.team_id else "looks.json")
 
     def player_frames(self, sets, tracking) -> list[dict]:
         """Player positions in court metres for the 2D view."""
@@ -273,6 +319,9 @@ class Job:
             if by_pos:
                 self.lineups[n] = [by_pos.get(p) for p in range(1, 7)]
         self.middles = {int(p["number"]) for p in game.get("roster", []) if p.get("position") == "middle" and p.get("number") is not None}
+        self.roster = {int(p["number"]) for p in game.get("roster", []) if p.get("number") is not None}
+        self.team_id = (game.get("team") or {}).get("id")
+        self.labels = {int(k): int(v) for k, v in (game.get("tracks") or {}).items() if v is not None}
         if self.lineups:
             log.info("ustawienia z VVA / lineups: %s", {k: v for k, v in sorted(self.lineups.items())})
 
@@ -282,7 +331,7 @@ class Job:
         data = {
             "obs": [[o.t, o.x, o.y, o.conf, o.half] for o in self.obs],
             "readings": [[r.t, r.left, r.right, int(r.replay)] for r in self.readings],
-            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2), round(p.w, 4), round(p.h, 4), p.num, round(p.num_conf, 2)]
+            "people": [[t, [[round(p.x, 4), round(p.y, 4), round(p.conf, 2), round(p.w, 4), round(p.h, 4), p.num, round(p.num_conf, 2), p.sig]
                             for p in ps]] for t, ps in self.people],
         }
         path.write_text(json.dumps(data), encoding="utf-8")

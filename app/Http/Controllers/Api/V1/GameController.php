@@ -58,6 +58,8 @@ class GameController extends Controller
                         'number' => $l->player?->number,
                     ])->values(),
             ])->values(),
+            // jersey numbers the analyst gave to analyzer tracks (2D view): the analyzer learns from them
+            'tracks' => (object) $game->tracks()->whereNotNull('number')->pluck('number', 'track')->all(),
             'roster' => Player::query()->forClub($game->club_id)->where('team_id', $game->team_id)->get()
                 ->map(fn (Player $p) => [
                     'id' => $p->id,

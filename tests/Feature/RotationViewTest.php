@@ -71,11 +71,13 @@ it('gives the rotations to the 2D court and saves the liberos with the lineup', 
         ->and($set->fresh()->libero_defense_id)->toBeNull();
 });
 
-it('tells the analyzer the libero numbers', function () {
+it('tells the analyzer the libero numbers and the analyst\'s track labels', function () {
     ['club' => $club, 'game' => $game] = gameWithRotation();
+    $game->tracks()->create(['track' => 42, 'team' => 'us', 'number' => 12]);
     Sanctum::actingAs(member($club, Role::Admin), ['analysis:write']);
 
     $this->getJson("/api/v1/games/{$game->id}")->assertOk()
         ->assertJsonPath('data.sets.0.libero_reception', 20)
-        ->assertJsonPath('data.sets.0.libero_defense', 21);
+        ->assertJsonPath('data.sets.0.libero_defense', 21)
+        ->assertJsonPath('data.tracks.42', 12);
 });
