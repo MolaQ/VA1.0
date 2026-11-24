@@ -119,7 +119,26 @@ export default (videoId) => ({
             this.player.playVideo();
         }
 
-        this.$el.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+        this.revealVideo();
+    },
+
+    // Bring the player into view when it is not visible (it is sticky on most layouts),
+    // so clicking an action far down a list always shows the jump.
+    revealVideo() {
+        // not this.$el: called from a list button, Alpine's $el is that button (the old bug:
+        // the page never scrolled back to the video, so a click seemed to do nothing)
+        const el = document.querySelector('[data-yt] [x-ref="screen"]') ?? document.querySelector('[data-yt]');
+
+        if (!el) {
+            return;
+        }
+
+        const rect = el.getBoundingClientRect();
+        const top = document.querySelector('body > div > header')?.offsetHeight ?? 0;
+
+        if (rect.top < top - 1 || rect.bottom > window.innerHeight + 1) {
+            el.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+        }
     },
 
     load(clips) {
