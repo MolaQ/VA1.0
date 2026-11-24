@@ -23,8 +23,10 @@ class VvaClient:
                     raise httpx.HTTPStatusError("retry", request=r.request, response=r)
                 if r.status_code == 401:
                     raise SystemExit(
-                        "VVA odrzucilo token (401). Sprawdz VVA_API_TOKEN (caly, razem z '1|') i czy nie zostal uniewazniony.\n"
-                        "VVA rejected the token (401): check VVA_API_TOKEN and that it was not revoked."
+                        f"Serwer {self.http.base_url} odrzucił token (401).\n"
+                        "Token musi pochodzić z tej samej strony VVA, której adres jest w ustawieniach "
+                        "(np. utworzony na http://127.0.0.1:8000 nie zadziała na http://localhost/molak/VVA/public).\n"
+                        f"VVA at {self.http.base_url} rejected the token (401)."
                     )
                 if r.status_code == 403:
                     raise SystemExit(f"Brak uprawnien do {url} (403): token musi nalezec do klubu tego meczu.")
