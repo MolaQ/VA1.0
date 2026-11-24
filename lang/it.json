@@ -556,5 +556,7 @@
     "match": "partita",
     "Compare matches": "Confronta partite",
     "Metric": "Indicatore",
-    "Coding": "Codifica"
+    "Coding": "Codifica",
+    "No video time": "Nessun tempo nel video",
+    "No video time: find this moment in the video, then confirm and the current video time is saved with it.": "Nessun tempo nel video: trova il momento nel video e conferma, verrà salvato il tempo attuale del lettore."
 }
