@@ -45,16 +45,29 @@ function Install-Torch($vpy, [bool]$useGpu) {
     }
     if ($useGpu) {
         Step 'Instaluję PyTorch dla karty NVIDIA (ok. 3 GB, to potrwa kilka minut)'
+        Test-FreeSpace 7   # 2.5 GB download + ~4.5 GB installed
         foreach ($cu in @('cu126', 'cu128', 'cu124')) {
-            & $vpy -m pip install torch torchvision --index-url "https://download.pytorch.org/whl/$cu"
+            # --no-cache-dir: the 2.5 GB wheel is not kept a second time in pip's cache
+            & $vpy -m pip install torch torchvision --no-cache-dir --resume-retries 20 --index-url "https://download.pytorch.org/whl/$cu"
             if ($LASTEXITCODE -eq 0) { return }
-            Write-Host "Wersja $cu niedostępna, próbuję kolejnej..." -ForegroundColor Yellow
+            Write-Host "Wersja $cu nie zainstalowała się (sieć albo miejsce na dysku), próbuję kolejnej..." -ForegroundColor Yellow
+            & $vpy -m pip cache purge 2>$null | Out-Null
+            Test-FreeSpace 7
         }
         throw 'Instalacja PyTorch (CUDA) nie powiodła się.'
     }
     Step 'Instaluję PyTorch na procesor (analiza będzie wolniejsza)'
-    & $vpy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    & $vpy -m pip install torch torchvision --no-cache-dir --resume-retries 20 --index-url https://download.pytorch.org/whl/cpu
     if ($LASTEXITCODE -ne 0) { throw 'Instalacja PyTorch nie powiodła się.' }
+}
+
+function Test-FreeSpace([double]$needGB) {
+    $drive = (Get-Item $env:LOCALAPPDATA).PSDrive
+    $free = [math]::Round($drive.Free / 1GB, 1)
+    if ($free -lt $needGB) {
+        throw "Za mało miejsca na dysku $($drive.Name): wolne $free GB, potrzeba około $needGB GB. Zwolnij miejsce (np. Kosz, Pobrane, Oczyszczanie dysku) i uruchom instalator ponownie."
+    }
+    Write-Host "Wolne miejsce na dysku $($drive.Name): $free GB"
 }
 
 function Find-Python312 {
@@ -73,6 +86,14 @@ try {
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith((Join-Path $AppDir 'venv'), 'OrdinalIgnoreCase') } |
         ForEach-Object { Write-Host "Zamykam działający VVA Analyzer (PID $($_.ProcessId))"; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+    Step 'Sprawdzam miejsce na dysku'
+    $pipCache = Join-Path $env:LOCALAPPDATA 'pip\cache'
+    if (Test-Path $pipCache) {
+        Write-Host 'Usuwam pamięć podręczną pip z poprzednich prób...'
+        Remove-Item -Recurse -Force $pipCache -ErrorAction SilentlyContinue
+    }
+    Test-FreeSpace 2
 
     Step 'Szukam Pythona 3.12'
     $py = Find-Python312
@@ -108,7 +129,7 @@ try {
     Install-Torch $vpy $gpu
 
     Step 'Instaluję VVA Analyzer'
-    & $vpy -m pip install --upgrade "$(Join-Path $AppDir 'app')[vision,tray]"
+    & $vpy -m pip install --upgrade --no-cache-dir "$(Join-Path $AppDir 'app')[vision,tray]"
     if ($LASTEXITCODE -ne 0) { throw 'Instalacja VVA Analyzer nie powiodła się.' }
 
     Step 'Pobieram modele AI (wykrywanie piłki i odczyt wyniku)'
