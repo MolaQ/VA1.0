@@ -108,7 +108,7 @@
                                 ])>
                                     <x-icon :name="$r['winner'] === null ? 'clock' : 'flag'" class="size-4 shrink-0" />
                                     <span>{{ match ($r['winner']) { 'us' => __('Point us'), 'them' => __('Point opponent'), default => __('No winner yet') } }}</span>
-                                    <span class="font-normal text-muted">· {{ $r['outcome'] }} · {{ $r['after'][0] }}:{{ $r['after'][1] }}</span>
+                                    <span class="font-normal text-muted">@if (! in_array($r['outcome'], [__('Point us'), __('Point opponent')], true))· {{ $r['outcome'] }} @endif· {{ $r['after'][0] }}:{{ $r['after'][1] }}</span>
                                 </li>
                             </ol>
 

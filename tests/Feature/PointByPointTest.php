@@ -64,6 +64,8 @@ it('lists every rally of a set with the score, the server, the winner and the to
         ->and($rallies[0]['hasServe'])->toBeFalse()
         ->and($rallies[0]['start'])->toBe(11.0)
         ->and($rallies[2]['actions'])->toHaveCount(0)
+        // no touch of ours tells how the point was won or lost: say only who won it
+        ->and($rallies[2]['outcome'])->toBe(__('Point opponent'))
         ->and($component->viewData('loose')->pluck('external_id')->all())->toBe(['x1']);
 });
 
