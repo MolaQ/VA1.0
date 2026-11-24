@@ -342,6 +342,27 @@
             </div>
         </x-ui.card>
 
+        @if ($game->youtube_id)
+            <x-ui.card class="mt-6" title="{{ __('Trimmed recording') }}" subtitle="{{ __('Cut the warm-up (or anything at the start) on YouTube? Move every time of this match by the same amount, so clicks land on the right touch again. Your corrections stay.') }}">
+                <div x-data="{ value: '', dir: 'cut', get seconds() { const v = String(this.value).trim(); if (! v) return null; const parts = v.split(':').map(Number); if (parts.some(Number.isNaN)) return null; const s = parts.reduce((acc, p) => acc * 60 + p, 0); return s > 0 ? (this.dir === 'cut' ? -s : s) : null } }" class="flex flex-wrap items-end gap-3">
+                    <label class="block">
+                        <span class="label">{{ __('What changed') }}</span>
+                        <select x-model="dir" class="input !w-auto !py-1.5 text-sm">
+                            <option value="cut">{{ __('Cut from the start') }}</option>
+                            <option value="added">{{ __('Added at the start') }}</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="label">{{ __('How long (mm:ss or seconds)') }}</span>
+                        <input type="text" x-model="value" inputmode="numeric" placeholder="12:30" class="input !w-32 !py-1.5 text-sm tabular">
+                    </label>
+                    <x-ui.button size="sm" variant="secondary" icon="clock" ::disabled="seconds === null"
+                                 x-on:click="if (confirm(@js(__('Move every video time of this match by')) + ' ' + seconds + ' s?')) { $wire.shiftVideoTimes(seconds); value = '' }">{{ __('Move times') }}</x-ui.button>
+                    <p class="w-full text-xs text-muted">{{ __('Tip: note the time of the first serve before and after trimming; the difference is the length to enter.') }}</p>
+                </div>
+            </x-ui.card>
+        @endif
+
         <x-ui.card class="mt-6" title="{{ __('Starting lineups') }}" subtitle="{{ __('Rotation at the start of each set: position I serves first. With it the AI knows who serves each rally.') }}">
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 @for ($i = 1; $i <= 5; $i++)

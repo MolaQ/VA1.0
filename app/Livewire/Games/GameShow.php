@@ -15,6 +15,7 @@ use App\Models\GameRally;
 use App\Models\GameTrack;
 use App\Models\Player;
 use App\Services\ActionIngestor;
+use App\Services\VideoTimeShifter;
 use App\Stats\GameStatsCalculator;
 use App\Stats\PassQuality;
 use App\Support\Visibility;
@@ -422,6 +423,21 @@ class GameShow extends Component
             $set->lineups()->updateOrCreate(['player_id' => $playerId], ['rotation_position' => $pos, 'is_substitute' => false]);
         }
         $this->toast(__('Lineup saved.'));
+    }
+
+    /**
+     * The recording was trimmed on YouTube: move every stored moment of the match.
+     * Negative = earlier (e.g. -720 after cutting a 12-minute warm-up).
+     */
+    public function shiftVideoTimes(float $seconds, VideoTimeShifter $shifter): void
+    {
+        Gate::authorize('update', $this->game);
+        abort_unless(abs($seconds) >= 0.01 && abs($seconds) <= 6 * 3600, 422);
+
+        $result = $shifter->shift($this->game, $seconds);
+        $this->dispatch('stats-refreshed');
+        $this->toast(__('Video times moved by :s s: :n touches.', ['s' => ($seconds > 0 ? '+' : '').round($seconds, 2), 'n' => $result['actions']])
+            .($result['untimed'] > 0 ? ' '.__(':n fell into the cut part and lost their time.', ['n' => $result['untimed']]) : ''));
     }
 
     public function reanalyze(): void
