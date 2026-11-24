@@ -220,3 +220,15 @@ it('shows running analyses with an estimate on the integrations page', function 
         ->assertSee('Analiza obrazu: 30 z 120 min')
         ->assertSee('25%');
 });
+
+it('puts an interrupted analysis back in the queue', function () {
+    ['club' => $club, 'game' => $game] = clubWithGame();
+    $game->forceFill(['analysis_status' => AnalysisStatus::Processing, 'analysis_progress' => 40, 'analysis_updated_at' => now()])->save();
+
+    Livewire\Livewire::actingAs(member($club, Role::Admin))
+        ->test(Integrations::class)
+        ->call('requeue', $game->id);
+
+    expect($game->fresh()->analysis_status)->toBe(AnalysisStatus::Queued);
+    $this->artisan('vva:queue')->assertSuccessful();
+});

@@ -47,11 +47,21 @@
                                 @if ($st->value === 'processing'){{ $job->analysis_progress }}% · @endif
                                 {{ $job->analysis_message ?? '—' }}
                             </p>
+                            @if ($job->youtube_id === null)
+                                <p class="mt-1 text-xs font-semibold text-warning-400">{{ __('No YouTube link: the agent cannot take this match.') }}</p>
+                            @endif
                             <p class="mt-0.5 text-xs text-muted">
                                 @if ($left !== null){{ __('About :time left', ['time' => \Carbon\CarbonInterval::seconds($left)->cascade()->forHumans(['short' => true, 'parts' => 2])]) }} · @endif
                                 @if ($job->analysis_started_at && $st->value === 'processing'){{ __('started :time', ['time' => $job->analysis_started_at->diffForHumans()]) }} · @endif
                                 {{ __('updated :time', ['time' => $job->analysis_updated_at?->diffForHumans() ?? '—']) }}
                             </p>
+                            @if ($st->value !== 'queued')
+                                <button type="button" wire:click="requeue({{ $job->id }})"
+                                        @if ($st->value === 'processing') wire:confirm="{{ __('The analysis is still running or was interrupted. Put the match back in the queue?') }}" @endif
+                                        class="mt-1.5 text-xs font-semibold text-brand-400 hover:underline">
+                                    {{ $st->value === 'completed' ? __('Analyse again') : __('Back to the queue') }}
+                                </button>
+                            @endif
                         </li>
                     @empty
                         <li class="px-5 py-6 text-sm text-muted">{{ __('No analyses yet.') }}</li>

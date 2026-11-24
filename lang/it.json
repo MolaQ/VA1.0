@@ -528,5 +528,11 @@
     "About :time left": "Mancano circa :time",
     "started :time": "iniziata :time",
     "updated :time": "aggiornata :time",
-    "No analyses yet.": "Nessuna analisi finora."
+    "No analyses yet.": "Nessuna analisi finora.",
+    "Back in the queue.": "Di nuovo in coda.",
+    "Match is back in the queue.": "La partita è tornata in coda.",
+    "No YouTube link: the agent cannot take this match.": "Nessun link YouTube: l'agente non può prendere questa partita.",
+    "The analysis is still running or was interrupted. Put the match back in the queue?": "L'analisi è in corso o è stata interrotta. Rimettere la partita in coda?",
+    "Analyse again": "Analizza di nuovo",
+    "Back to the queue": "Rimetti in coda"
 }

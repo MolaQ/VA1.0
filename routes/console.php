@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Club;
+use App\Models\Game;
 use App\Models\PageView;
 use App\Models\User;
 use Illuminate\Foundation\Inspiring;
@@ -56,6 +57,27 @@ Artisan::command('vva:check-token {token}', function () {
 
     return 0;
 })->purpose('Check an analyzer API token against this database');
+
+Artisan::command('vva:queue {--reset : put interrupted analyses (processing) back in the queue}', function () {
+    $games = Game::query()->whereIn('analysis_status', ['queued', 'processing'])->orderBy('id')->get();
+    if ($games->isEmpty()) {
+        $this->info('Kolejka pusta / queue empty.');
+
+        return 0;
+    }
+    $this->table(['id', 'klub', 'status', '%', 'YouTube', 'aktualizacja', 'opis'], $games->map(fn (Game $g) => [
+        $g->id, $g->club_id, $g->analysis_status->value, $g->analysis_progress, $g->youtube_id ?? 'BRAK',
+        $g->analysis_updated_at?->diffForHumans() ?? '-', mb_strimwidth((string) $g->analysis_message, 0, 50, '…'),
+    ])->all());
+    if ($this->option('reset')) {
+        $n = Game::query()->where('analysis_status', 'processing')->update([
+            'analysis_status' => 'queued', 'analysis_progress' => 0, 'analysis_started_at' => null, 'analysis_updated_at' => now(),
+        ]);
+        $this->info("Przywrócono do kolejki: {$n}");
+    }
+
+    return 0;
+})->purpose('Show the analysis queue (and reset interrupted analyses)');
 
 // Cookie-less analytics: delete raw page views past the retention window.
 Schedule::command('model:prune', ['--model' => [PageView::class]])->daily();

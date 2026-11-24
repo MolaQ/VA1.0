@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 class AgentController extends Controller
 {
     /** A match "processing" without any report for this long is given to another agent. */
-    public const STALE_MINUTES = 30;
+    public const STALE_MINUTES = 15;
 
     public function claim(Request $request): JsonResponse|Response
     {

@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Club;
 
+use App\Enums\AnalysisStatus;
+use App\Events\GameAnalysisUpdated;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
 use Illuminate\Contracts\View\View;
@@ -38,6 +40,25 @@ class Integrations extends Component
             ->plainTextToken;
 
         $this->toast(__('Token created. Copy it now.'));
+    }
+
+    /**
+     * Put a match back in the queue: for an analysis that stopped (agent closed, disk full)
+     * or to analyse it again. The agent takes it within a few seconds.
+     */
+    public function requeue(int $gameId): void
+    {
+        Gate::authorize('manage', $this->club());
+        $game = Game::query()->where('club_id', $this->club()->id)->findOrFail($gameId);
+        $game->forceFill([
+            'analysis_status' => AnalysisStatus::Queued,
+            'analysis_progress' => 0,
+            'analysis_message' => __('Back in the queue.'),
+            'analysis_started_at' => null,
+            'analysis_updated_at' => now(),
+        ])->save();
+        GameAnalysisUpdated::dispatch($game);
+        $this->toast(__('Match is back in the queue.'));
     }
 
     public function revoke(int $tokenId): void

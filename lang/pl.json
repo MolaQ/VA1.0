@@ -528,5 +528,11 @@
     "About :time left": "Zostało ok. :time",
     "started :time": "start :time",
     "updated :time": "aktualizacja :time",
-    "No analyses yet.": "Jeszcze nie było analiz."
+    "No analyses yet.": "Jeszcze nie było analiz.",
+    "Back in the queue.": "Ponownie w kolejce.",
+    "Match is back in the queue.": "Mecz wrócił do kolejki.",
+    "No YouTube link: the agent cannot take this match.": "Brak linku YouTube: agent nie może wziąć tego meczu.",
+    "The analysis is still running or was interrupted. Put the match back in the queue?": "Analiza wciąż trwa albo została przerwana. Przywrócić mecz do kolejki?",
+    "Analyse again": "Analizuj ponownie",
+    "Back to the queue": "Wróć do kolejki"
 }
