@@ -585,7 +585,6 @@
     "No rallies yet. They appear as the AI or the coder records touches.": "Brak wymian. Pojawią się, gdy AI lub koder zapisze zagrania.",
     "Not in a rally": "Poza wymianą",
     "These touches have no set or rally number. Edit them to put them in the right rally.": "Te zagrania nie mają numeru seta albo wymiany. Edytuj je, aby przypisać do właściwej wymiany.",
-    "Edit touch": "Edytuj zagranie",
     "Unknown": "Nieznany",
     "Use the current video time": "Ustaw aktualny czas wideo",
     "no time": "bez czasu",
@@ -593,5 +592,13 @@
     "Block point": "Punktowy blok",
     "Our error": "Nasz błąd",
     "Attack blocked": "Atak zablokowany",
-    "Outcome unknown": "Wynik nieznany"
+    "Outcome unknown": "Wynik nieznany",
+    "Saved": "Zapisano",
+    "Added": "Dodano",
+    "Time from video": "Czas z wideo",
+    "Set this touch to the current video time": "Ustaw temu zagraniu aktualny czas wideo",
+    "Done": "Gotowe",
+    "The grade records the touch. The form stays open for the next one.": "Ocena od razu zapisuje zagranie. Formularz zostaje otwarty na następne.",
+    "Last coded in set :set": "Ostatnio zakodowane w secie :set",
+    "Wrong touch? Pencil: every change is saved at once.": "Pomyłka? Ołówek: każda zmiana zapisuje się od razu."
 }

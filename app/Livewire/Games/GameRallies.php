@@ -5,7 +5,7 @@ namespace App\Livewire\Games;
 use App\Enums\ActionSource;
 use App\Enums\Grade;
 use App\Enums\Skill;
-use App\Events\GameActionsRecorded;
+use App\Livewire\Concerns\EditsActionsLive;
 use App\Livewire\Concerns\InteractsWithClub;
 use App\Models\Game;
 use App\Models\GameAction;
@@ -27,6 +27,7 @@ use Livewire\Component;
  */
 class GameRallies extends Component
 {
+    use EditsActionsLive;
     use InteractsWithClub;
 
     #[Locked]
@@ -49,43 +50,8 @@ class GameRallies extends Component
         ];
     }
 
-    /**
-     * Correct one touch: who, what, how good, which rally; optionally take the player's time.
-     */
-    public function updateAction(int $actionId, ?int $playerId, string $skill, string $grade, ?int $set = null, ?int $rally = null, ?float $time = null): void
+    protected function actionsChanged(): void
     {
-        Gate::authorize('code', $this->game);
-
-        $action = $this->game->actions()->findOrFail($actionId);
-        $this->assertPlayer($playerId);
-
-        $action->player_id = $playerId;
-        $action->skill = Skill::from($skill);
-        $action->grade = Grade::from($grade);
-
-        if ($set !== null) {
-            abort_unless($set >= 1 && $set <= 5, 422);
-            $action->game_set_id = $this->game->sets()->firstOrCreate(['number' => $set])->id;
-        }
-
-        if ($rally !== null) {
-            abort_unless($rally >= 1 && $rally <= 999, 422);
-            $action->rally = $rally;
-        }
-
-        if ($time !== null && $time >= 0) {
-            $action->video_time = round($time, 2);
-        }
-
-        // a person looked at it: the analyzer must not undo the correction
-        if ($action->source === ActionSource::Ai) {
-            $action->fill(['reviewed_at' => now()]);
-        }
-
-        $action->needs_review = $action->needs_review && $action->player_id === null;
-        $action->save();
-
-        GameActionsRecorded::dispatch($this->game, 0, 1, 0, [$action->toBroadcast()]);
         $this->dispatch('rallies-changed');
     }
 
@@ -115,6 +81,7 @@ class GameRallies extends Component
         }
 
         $this->dispatch('rallies-changed');
+        $this->toast(__('Added').': '.trim(($result->actions->first()?->player?->numberLabel() ?? '?').' · '.Skill::from($skill)->label().' '.$grade));
     }
 
     public function deleteAction(int $actionId, ActionIngestor $ingestor): void

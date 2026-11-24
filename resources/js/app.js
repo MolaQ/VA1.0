@@ -19,4 +19,6 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('court2d', court2d);
     window.Alpine.data('matchPanel', matchPanel);
     window.Alpine.data('ralliesPanel', ralliesPanel);
+    // roster / skills / grades for editing touches in place (filled by the match page)
+    window.Alpine.store('codes', { roster: [], skills: [] });
 });

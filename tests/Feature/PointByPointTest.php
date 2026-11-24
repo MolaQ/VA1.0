@@ -7,6 +7,7 @@ use App\Enums\Skill;
 use App\Events\GameActionsRecorded;
 use App\Events\GameAnalysisUpdated;
 use App\Livewire\Games\GameRallies;
+use App\Livewire\Games\GameShow;
 use App\Models\GameRally;
 use App\Services\ActionIngestor;
 use Illuminate\Support\Facades\Event;
@@ -74,8 +75,13 @@ it('lets the coach correct a touch and put it into a rally', function () {
 
     Livewire::actingAs(member($club, Role::Trainer))
         ->test(GameRallies::class, ['game' => $game])
-        ->call('updateAction', $loose->id, $players[2]->id, 'dig', '+', 1, 3, 77.4)
-        ->assertDispatched('rallies-changed');
+        ->call('patchAction', $loose->id, 'player', (string) $players[2]->id)
+        ->call('patchAction', $loose->id, 'grade', '+')
+        ->call('patchAction', $loose->id, 'set', '1')
+        ->call('patchAction', $loose->id, 'rally', '3')
+        ->call('patchAction', $loose->id, 'time', '77.4')
+        ->assertDispatched('rallies-changed')
+        ->assertDispatched('toast');
 
     $loose->refresh();
     expect($loose->player_id)->toBe($players[2]->id)
@@ -117,6 +123,7 @@ it('adds touches and rallies, and overrides who won', function () {
         ->and(collect($rallies)->pluck('number')->all())->toBe([1, 2, 3, 4]);
 
     $component->call('addAction', 1, 3, 999999, 'dig', '-')->assertStatus(422);
+    $component->call('patchAction', $game->actions()->first()->id, 'grade', 'x')->assertStatus(422);
 });
 
 it('lets players watch the rallies but not edit them', function () {
@@ -126,7 +133,7 @@ it('lets players watch the rallies but not edit them', function () {
         ->test(GameRallies::class, ['game' => $game])
         ->assertSee(__('Opponent serve'))
         ->assertDontSee(__('Add touch'))
-        ->call('updateAction', $loose->id, null, 'dig', '#')
+        ->call('patchAction', $loose->id, 'grade', '#')
         ->assertForbidden();
 });
 
@@ -138,4 +145,26 @@ it('shows the point-by-point tab on the match page', function () {
         ->assertOk()
         ->assertSee(__('Point by point'))
         ->assertSeeLivewire(GameRallies::class);
+});
+
+it('edits a just coded touch live from the coding tab', function () {
+    ['club' => $club, 'game' => $game, 'players' => $players] = clubWithGame();
+
+    $component = Livewire::actingAs(member($club, Role::Trainer))
+        ->test(GameShow::class, ['game' => $game])
+        ->call('record', $players[0]->id, 'attack', '#', 20.0);
+
+    $action = $game->actions()->first();
+
+    $component->assertSee(__('Last coded in set :set', ['set' => 1]))
+        ->call('patchAction', $action->id, 'player', (string) $players[1]->id)
+        ->call('patchAction', $action->id, 'skill', 'block')
+        ->call('patchAction', $action->id, 'time', '')
+        ->assertDispatched('stats-refreshed')
+        ->assertDispatched('toast');
+
+    $action->refresh();
+    expect($action->player_id)->toBe($players[1]->id)
+        ->and($action->skill)->toBe(Skill::Block)
+        ->and($action->video_time)->toBeNull();
 });

@@ -95,7 +95,7 @@
                                     </li>
                                 @endunless
                                 @foreach ($r['actions'] as $a)
-                                    @include('livewire.games.partials.rally-action', ['a' => $a])
+                                    @include('livewire.games.partials.action-row', ['a' => $a])
                                 @endforeach
                                 @if ($r['hidden'] > 0)
                                     <li class="px-2 py-1 text-xs text-subtle">{{ trans_choice('+ :count touch of other players|+ :count touches of other players', $r['hidden']) }}</li>
@@ -157,24 +157,24 @@
                 <p class="px-3 py-1.5 text-xs text-muted">{{ __('These touches have no set or rally number. Edit them to put them in the right rally.') }}</p>
                 <ol class="px-1">
                     @foreach ($loose as $a)
-                        @include('livewire.games.partials.rally-action', ['a' => $a])
+                        @include('livewire.games.partials.action-row', ['a' => $a])
                     @endforeach
                 </ol>
             </div>
         </section>
     @endif
 
-    {{-- Shared edit / add form --}}
+    {{-- Adding touches to a rally: pick player and skill, a grade records it at once (no save button) --}}
     @if ($canCode)
         <div x-show="form" x-cloak x-transition class="sticky bottom-0 z-20 border-t border-line bg-surface-2 p-3 shadow-2xl">
             <template x-if="form">
-                <form x-on:submit.prevent="save()" class="space-y-2">
+                <div class="space-y-2">
                     <div class="flex items-center gap-2 text-sm">
-                        <span class="font-semibold" x-text="form.mode === 'edit' ? @js(__('Edit touch')) : @js(__('Add touch'))"></span>
-                        <span class="truncate text-xs text-muted" x-text="form.mode === 'edit' ? form.label : ('Set ' + form.set + ' · #' + form.rally)"></span>
+                        <span class="font-semibold">{{ __('Add touch') }}</span>
+                        <span class="truncate text-xs text-muted" x-text="'Set ' + form.set + ' · #' + form.rally"></span>
                         <button type="button" x-on:click="form = null" class="ml-auto rounded-lg p-1 text-muted hover:text-fg" aria-label="{{ __('Close') }}"><x-icon name="x" class="size-4" /></button>
                     </div>
-                    <div class="grid grid-cols-3 gap-1.5">
+                    <div class="grid grid-cols-2 gap-1.5">
                         <select x-model="form.pid" class="input !px-2 !py-1 text-sm tabular" aria-label="{{ __('Player') }}">
                             <option value="">? {{ __('Unknown') }}</option>
                             <template x-for="p in roster" :key="p.id">
@@ -186,28 +186,19 @@
                                 <option :value="s.value" x-text="s.label" :selected="s.value === form.skill"></option>
                             </template>
                         </select>
-                        <select x-model="form.grade" class="input !px-2 !py-1 text-sm" aria-label="{{ __('Grade') }}">
-                            <template x-for="g in grades" :key="g.value">
-                                <option :value="g.value" x-text="g.value + ' ' + g.label" :selected="g.value === form.grade"></option>
-                            </template>
-                        </select>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 text-sm">
-                        <template x-if="form.mode === 'edit'">
-                            <span class="flex items-center gap-1.5">
-                                <label class="text-xs text-muted">Set</label>
-                                <input type="number" min="1" max="5" x-model="form.set" class="input !w-14 !px-2 !py-1 text-sm tabular">
-                                <label class="text-xs text-muted">{{ __('Rally') }}</label>
-                                <input type="number" min="1" max="999" x-model="form.rally" class="input !w-16 !px-2 !py-1 text-sm tabular">
-                            </span>
-                        </template>
-                        <label class="flex items-center gap-1.5 text-xs text-muted">
-                            <input type="checkbox" x-model="form.useTime" class="rounded">
-                            <span>{{ __('Use the current video time') }}</span>
-                        </label>
-                        <x-ui.button type="submit" size="sm" icon="check" class="ml-auto" ::disabled="busy">{{ __('Save') }}</x-ui.button>
+                    <div class="grid grid-cols-6 gap-1">
+                        @foreach (\App\Enums\Grade::cases() as $g)
+                            <button type="button" x-on:click="add(@js($g->value))" :disabled="busy" title="{{ $g->label() }}"
+                                    class="rounded-lg py-1.5 font-display text-lg font-bold transition active:scale-95 disabled:opacity-40 {{ $gradeStyles[$g->value] }}">{{ $g->value }}</button>
+                        @endforeach
                     </div>
-                </form>
+                    <label class="flex items-center gap-1.5 text-xs text-muted">
+                        <input type="checkbox" x-model="form.useTime" class="rounded">
+                        <span>{{ __('Use the current video time') }}</span>
+                    </label>
+                    <p class="text-xs text-subtle">{{ __('The grade records the touch. The form stays open for the next one.') }}</p>
+                </div>
             </template>
         </div>
     @endif
