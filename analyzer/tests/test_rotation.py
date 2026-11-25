@@ -23,7 +23,15 @@ def test_overlap_rule_picks_the_order():
     # serving: the server behind the end line is zone 1 whatever x
     players = [(1.0, -1.0), (7.8, 7.5), (4.0, 7.8), (1.0, 6.8), (2.0, 2.5), (6.0, 3.0)]
     assert match_zones(players, serving=True)[1] == 0
-    assert match_zones(players[:5], serving=True) is None
+    # one player not seen: the other five still get their zones, zone 6 stays empty
+    five = match_zones(players[:5], serving=True)
+    assert five == {1: 0, 2: 1, 3: 2, 4: 3, 5: 4}
+    assert match_zones(players[:4], serving=True) is None
+
+
+def test_a_seventh_person_is_left_out():
+    players = [(7.0, 4.5), (7.8, 7.5), (4.0, 7.8), (1.0, 6.8), (2.0, 2.5), (4.8, 3.0), (9.5, 0.2)]
+    assert match_zones(players, serving=False) == {1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5}
 
 
 def test_rotation_votes_name_the_tracks():

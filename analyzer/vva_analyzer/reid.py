@@ -150,10 +150,15 @@ def learn(prints: dict[int, dict], numbers: dict[int, int], known: dict[int, dic
 
 
 def reid_votes(tracking: Tracking, prints: dict[int, dict], known: dict[int, dict],
-               allowed: set[int] | None = None, ours: set[int] | None = None) -> int:
-    """Vote the closest known fingerprint for our tracks without a number; returns how many got one."""
+               allowed: set[int] | None = None, ours: set[int] | None = None, diag: dict | None = None) -> int:
+    """Vote the closest known fingerprint for our tracks without a number; returns how many got one.
+
+    `diag`: filled with what happened (for the report), to tune MIN_SIM and MARGIN."""
+    diag = diag if diag is not None else {}
+    diag["gallery"] = len(known)
     if len(known) < 2:
         return 0
+    best, gaps = [], []
     gallery = [(n, np.array(k["emb"], dtype=np.float32)) for n, k in known.items() if allowed is None or n in allowed]
     voted = 0
     for track, fp in prints.items():
@@ -164,10 +169,16 @@ def reid_votes(tracking: Tracking, prints: dict[int, dict], known: dict[int, dic
         if len(scored) < 2:
             continue
         (s1, n1), (s2, _) = scored[0], scored[1]
+        best.append(s1)
+        gaps.append(s1 - s2)
         if s1 >= MIN_SIM and s1 - s2 >= MARGIN:
             for _ in range(2 if s1 >= CLEAR_SIM else 1):
                 tracking.vote(track, n1, VOTE)
             voted += 1
+    if best:
+        diag.update(candidates=len(best), below_sim=sum(1 for v in best if v < MIN_SIM),
+                    small_margin=sum(1 for v, g in zip(best, gaps) if v >= MIN_SIM and g < MARGIN),
+                    sim_median=round(float(np.median(best)), 3), margin_median=round(float(np.median(gaps)), 3))
     return voted
 
 
