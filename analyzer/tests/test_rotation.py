@@ -42,3 +42,14 @@ def test_rotation_votes_name_the_tracks():
                Rally(set=1, number=2, start=40.0, end=45.0, server="us", rotation=0)]
     assert rotation_votes(rallies, tracking, {1: LINEUP}, "near") == 2
     assert tracking.numbers == {11: 7, 12: 13, 13: 4, 14: 10, 15: 2, 16: 9}
+
+
+def test_at_serve_takes_a_player_missing_now_from_a_moment_earlier():
+    from vva_analyzer.players import Seen, Tracking
+    from vva_analyzer.rotation import at_serve
+
+    tr = Tracking([(9.0, [Seen(1, 1, 1, None, None), Seen(2, 2, 2, None, None)]),
+                   (10.0, [Seen(1, 1.1, 1, None, None)]),
+                   (5.0, [Seen(3, 3, 3, None, None)])], {})
+    got = {s.track: s.x for s in at_serve(tr, 10.0)}
+    assert got == {1: 1.1, 2: 2}

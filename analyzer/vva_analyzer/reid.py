@@ -30,9 +30,12 @@ from .players import Person, Tracking, on_court
 log = logging.getLogger("vva")
 
 VOTE = 0.6  # a bit more than the colour looks: the network sees more than two histograms
-MIN_SIM = 0.70  # cosine similarity a fingerprint needs to count at all
-MARGIN = 0.06  # the best number must beat the second best by this much
-CLEAR_SIM = 0.82  # this close counts as two reads: on its own it can name the player
+# Teammates in the same kit look ~0.95 alike to OSNet (first real match: median 0.945, the best
+# number beat the second by 0.009). So the fingerprints are compared after taking away the
+# team's mean fingerprint (the kit); what is left is the person. Thresholds on centred vectors:
+MIN_SIM = 0.30  # cosine similarity a fingerprint needs to count at all
+MARGIN = 0.10  # the best number must beat the second best by this much
+CLEAR_SIM = 0.55  # this close counts as two reads: on its own it can name the player
 
 
 class ReidTracker:
@@ -159,12 +162,19 @@ def reid_votes(tracking: Tracking, prints: dict[int, dict], known: dict[int, dic
     if len(known) < 2:
         return 0
     best, gaps = [], []
-    gallery = [(n, np.array(k["emb"], dtype=np.float32)) for n, k in known.items() if allowed is None or n in allowed]
+    team = [np.array(fp["emb"], dtype=np.float32) for t, fp in prints.items() if ours is None or t in ours]
+    centre = np.mean(team, axis=0) if team else 0.0
+
+    def centred(v) -> np.ndarray:
+        c = _unit(np.asarray(v, dtype=np.float32) - centre)
+        return c if c is not None else np.zeros_like(np.asarray(v, dtype=np.float32))
+
+    gallery = [(n, centred(k["emb"])) for n, k in known.items() if allowed is None or n in allowed]
     voted = 0
     for track, fp in prints.items():
         if track in tracking.numbers or (ours is not None and track not in ours):
             continue
-        v = np.array(fp["emb"], dtype=np.float32)
+        v = centred(fp["emb"])
         scored = sorted(((float(v @ g), n) for n, g in gallery), reverse=True)
         if len(scored) < 2:
             continue

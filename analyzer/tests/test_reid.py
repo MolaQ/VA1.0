@@ -107,3 +107,26 @@ def test_save_load_roundtrip(tmp_path):
     reid.save(path, {7: {"emb": [1.0, 0.0], "n": 3}})
     assert reid.load(path) == {7: {"emb": [1.0, 0.0], "n": 3}}
     assert reid.load(tmp_path / "missing.json") == {}
+
+
+def test_same_kit_is_taken_away_before_comparing():
+    from vva_analyzer.players import Seen, Track, Tracking
+
+    kit = np.zeros(8)
+    kit[0] = 5.0  # everyone shares a strong "kit" component: raw cosine ~0.98 for all
+
+    def look(i, extra=0.0):
+        v = kit.copy()
+        v[i] += 1.0
+        v[(i % 7) + 1] += extra
+        return (v / np.linalg.norm(v)).tolist()
+
+    tracks = {k: Track(k, 0, 0, 0) for k in range(1, 5)}
+    tracking = Tracking([(0.0, [Seen(k, 1, 1, None, None) for k in tracks])], {1: 7, 2: 12}, tracks)
+    prints = {1: {"emb": look(1), "n": 5}, 2: {"emb": look(2), "n": 5},
+              3: {"emb": look(1, 0.2), "n": 5}, 4: {"emb": look(3), "n": 5}}
+    known = reid.learn(prints, {1: 7, 2: 12})
+    diag = {}
+    reid.reid_votes(tracking, prints, known, diag=diag)
+    assert tracking.tracks[3].votes.get(7, 0) > 0
+    assert not tracking.tracks[3].votes.get(12)
