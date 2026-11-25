@@ -44,7 +44,11 @@ class ReidTracker:
 
         gpu = device not in (None, "cpu")
         self.tracker = BotSort(
-            config=BotSortConfig(max_lost_frames=int(3 * fps)),  # a player hidden for up to ~3 s keeps the id
+            config=BotSortConfig(
+                max_lost_frames=int(5 * fps),  # a player hidden for up to ~5 s keeps the id
+                # the defaults (~0.62) never start a track for a small, far-side player (YOLO conf 0.35-0.6)
+                track_high_thresh=0.45, new_track_thresh=0.45, track_low_thresh=0.1,
+            ),
             reid=ReIDConfig(model=model, device=device or "cpu", precision="fp16" if gpu else "fp32"),
         )
         self.sums: dict[int, np.ndarray] = {}

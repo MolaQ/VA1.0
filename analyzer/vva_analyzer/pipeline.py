@@ -297,6 +297,9 @@ class Job:
                 "serves_with_player": numbered,
                 "rallies_with_video_time": sum(1 for r in rallies if r.start is not None),
                 "position_frames": len(frames),
+                "track_pieces": getattr(self, "track_pieces", 0),
+                "tracks": len(tracking.tracks) if tracking else 0,
+                "stitched": getattr(self, "stitched", 0),
                 "numbered_tracks": len(tracking.numbers) if tracking else 0,
                 "rotation_matches": rotation_matches,
                 "looks_matched": looks_matched,
@@ -313,8 +316,17 @@ class Job:
             return None
         from .court import homography
 
+        from .players import stitch
+
         h = homography(self.cal.court, 1, 1, self.cal.court_ref)
-        return track_players(self.people, h, replays)
+        tracking = track_players(self.people, h, replays)
+        self.track_pieces = len(tracking.tracks)
+        prints = {}
+        if self.prints:
+            from .reid import track_fingerprints
+            prints = {k: v["emb"] for k, v in track_fingerprints(tracking, self.prints).items()}
+        self.stitched = stitch(tracking, prints)  # one player hidden for a moment = one track again
+        return tracking
 
     def _ours(self, tracking, sets) -> set[int]:
         """Track ids of our team: on our half for most of the time they were seen."""

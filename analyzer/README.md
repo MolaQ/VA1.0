@@ -38,12 +38,14 @@ Raz, w terminalu (PowerShell):
    py -3.12 -m venv .venv
    .venv\Scripts\Activate.ps1
    python -m pip install --upgrade pip
-   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
    python -m pip install -e ".[vision,tracking,server,dev]"
-   python -c "import torch; print(torch.cuda.is_available())"
+   python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
    ```
    Po aktywacji linia terminala zaczyna się od `(.venv)`; wszystkie dalsze polecenia wpisuj tylko w takim terminalu.
-   Ostatnie polecenie ma wypisać `True` (karta graficzna jest widoczna).
+   Ostatnie polecenie ma wypisać `True` (karta graficzna jest widoczna). Jeśli wersja kończy się na `+cpu`,
+   pip podmienił torch przy instalacji dodatków: `python -m pip uninstall -y torch torchvision`, potem
+   `python -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cu128`.
    Jeśli PowerShell blokuje `Activate.ps1`, wpisz raz `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 4. W VVA: **Klub → Integracje AI → utwórz token**. Skopiuj go, pokazuje się tylko raz.
 

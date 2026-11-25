@@ -77,3 +77,15 @@ def test_jersey_helpers():
     assert best_number([(None, "0", 0.9)]) == (None, 0.0)
     assert torso_box(Person(0.5, 0.9, 1, 0.05, 0.02), 1920, 1080) is None  # too small to read
     assert torso_box(Person(0.5, 0.9, 1, 0.05, 0.2), 1920, 1080) == (926, 788, 993, 864)
+
+
+def test_toucher_uses_the_sample_after_the_touch_too():
+    from vva_analyzer.players import Person, Seen, Tracking
+    from vva_analyzer.touches import Touch, toucher
+
+    far = Person(0.2, 0.8, w=0.04, h=0.2)
+    near = Person(0.5, 0.8, w=0.04, h=0.2)
+    tr = Tracking([(10.0, [Seen(1, 1, 1, None, far)]), (10.5, [Seen(2, 4, 3, None, near)])], {})
+    # the touch is closer in time to the first sample, but only the player of the second holds the ball
+    assert toucher(Touch(10.2, 0.51, 0.7, "near"), tr).track == 2
+    assert toucher(Touch(10.2, 0.9, 0.7, "near"), tr) is None

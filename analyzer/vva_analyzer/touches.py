@@ -53,18 +53,23 @@ def find_touches(obs: list[BallObs], min_speed: float = 0.15, gap: float = 0.5) 
 
 
 def toucher(touch: Touch, tracking: Tracking) -> Seen | None:
-    """The tracked player whose box holds the ball (a set is played a bit above the head)."""
+    """The tracked player whose box holds the ball (a set is played a bit above the head).
+
+    Positions are sampled twice a second, so the box is taken from the samples just before and
+    just after the touch; the further the sample is in time, the more slack (the player moves)."""
     best, best_d = None, math.inf
-    for s in tracking.at(touch.t):
-        p = s.person
-        if p is None or p.h <= 0:
-            continue
-        dx = max(0.0, abs(touch.x - p.x) - p.w * 0.6)
-        top, bottom = p.y - p.h * 1.5, p.y
-        dy = max(0.0, top - touch.y, touch.y - bottom)
-        d = math.hypot(dx, dy)
-        if d < best_d and d <= 0.02:
-            best, best_d = s, d
+    for st, seen in tracking.around(touch.t):
+        slack = 0.02 + 0.06 * abs(st - touch.t)
+        for s in seen:
+            p = s.person
+            if p is None or p.h <= 0:
+                continue
+            dx = max(0.0, abs(touch.x - p.x) - p.w * 0.6)
+            top, bottom = p.y - p.h * 1.5, p.y
+            dy = max(0.0, top - touch.y, touch.y - bottom)
+            d = math.hypot(dx, dy)
+            if d <= slack and d / slack < best_d:
+                best, best_d = s, d / slack
     return best
 
 

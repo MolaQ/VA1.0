@@ -133,7 +133,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Instalacja VVA Analyzer nie powiodła się.' }
 
     Step 'Instaluję śledzenie zawodników (BoT-SORT + re-ID)'
-    & $vpy -m pip install --upgrade --no-cache-dir "$(Join-Path $AppDir 'app')[tracking]"
+    # keep the torch build installed above (CUDA): without the pin pip may swap it for the CPU build from PyPI
+    $pin = Join-Path $env:TEMP 'vva-torch-pin.txt'
+    & $vpy -c "import torch, torchvision; print(f'torch=={torch.__version__}'); print(f'torchvision=={torchvision.__version__}')" | Set-Content -Encoding ascii $pin
+    & $vpy -m pip install --upgrade --no-cache-dir -c $pin "$(Join-Path $AppDir 'app')[tracking]"
     if ($LASTEXITCODE -ne 0) { Write-Host 'Śledzenie BoT-SORT pominięte: zostaje prostszy tracker.' -ForegroundColor Yellow }
 
     Step 'Pobieram modele AI (wykrywanie piłki i odczyt wyniku)'
