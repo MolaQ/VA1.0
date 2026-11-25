@@ -329,6 +329,8 @@ class Job:
             from .reid import track_fingerprints
             prints = {k: v["emb"] for k, v in track_fingerprints(tracking, self.prints).items()}
         self.stitched = stitch(tracking, prints)  # one player hidden for a moment = one track again
+        from .players import smooth
+        smooth(tracking)  # steadier positions for the 2D view and the rotation
         return tracking
 
     def _ours(self, tracking, sets) -> set[int]:

@@ -428,3 +428,28 @@ def stitch(tracking: Tracking, prints: dict[int, list[float]] | None = None, max
                 dst.reads[n] = dst.reads.get(n, 0) + src.reads.get(n, 0)
     tracking.numbers = {k: n for k, tr in tracking.tracks.items() if (n := tr.number()) is not None}
     return len(new)
+
+
+def smooth(tracking: Tracking, half_window: float = 0.6) -> None:
+    """Steadier dots: each position becomes the median of the same track's positions within
+    ±half_window seconds (feet points jump with every box: arms up, a jump, a player behind).
+    The median keeps real direction changes, unlike an average."""
+    by_track: dict[int, list[tuple[float, Seen]]] = {}
+    for t, seen in tracking.samples:
+        for s in seen:
+            by_track.setdefault(s.track, []).append((t, s))
+    for pts in by_track.values():
+        if len(pts) < 3:
+            continue
+        raw = [(t, s.x, s.y) for t, s in pts]
+        lo = 0
+        for i, (t, s) in enumerate(pts):
+            while raw[lo][0] < t - half_window:
+                lo += 1
+            hi = i
+            while hi + 1 < len(raw) and raw[hi + 1][0] <= t + half_window:
+                hi += 1
+            window = raw[lo:hi + 1]
+            if len(window) >= 3:
+                s.x = round(float(np.median([w[1] for w in window])), 2)
+                s.y = round(float(np.median([w[2] for w in window])), 2)
