@@ -139,3 +139,11 @@ def test_stitch_chains_and_picks_the_closest():
     tr = _tracking({1: [(0.0, 4, 3)], 2: [(1.0, 4.2, 3)], 3: [(2.0, 4.3, 3)], 4: [(1.0, 5.5, 3)]})
     assert stitch(tr) == 2  # 1 -> 2 -> 3; 4 started next to 2 but 2 is closer to 1
     assert {s.track for _, seen in tr.samples for s in seen} == {1, 4}
+
+
+def test_smooth_removes_a_jump_of_one_sample():
+    from vva_analyzer.players import smooth
+
+    tr = _tracking({1: [(0.0, 2, 3), (0.5, 2, 3), (1.0, 5, 6), (1.5, 2, 3), (2.0, 2, 3)]})
+    smooth(tr)
+    assert [(s.x, s.y) for _, seen in tr.samples for s in seen] == [(2, 3)] * 5

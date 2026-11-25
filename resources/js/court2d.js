@@ -43,6 +43,10 @@ export default (config) => ({
     shownSrc: null,
     dots: [],
     mode: storage.get('vva-court-mode') === 'live' ? 'live' : 'rotation',
+    // teams change ends every set: by default draw the court so that we always play on the left
+    usLeft: storage.get('vva-court-us-left') !== '0',
+    // the analysis is about our team: the opponents' dots are hidden unless asked for
+    showThem: storage.get('vva-court-them') === '1',
     rot: { players: {}, rallies: [] },
     current: null, // rally entry shown in rotation mode
     els: new Map(),
@@ -71,6 +75,30 @@ export default (config) => ({
         this.els.forEach((g) => g.remove());
         this.els.clear();
         this.tick();
+    },
+
+    toggleThem() {
+        this.showThem = !this.showThem;
+        storage.set('vva-court-them', this.showThem ? '1' : '0');
+        this.render();
+    },
+
+    toggleUsLeft() {
+        this.usLeft = !this.usLeft;
+        storage.set('vva-court-us-left', this.usLeft ? '1' : '0');
+        this.render();
+    },
+
+    /** true when the picture is drawn turned round (our team defends the far half now). */
+    flipped() {
+        return this.usLeft && this.ourSide(this.t ?? 0) === 'far';
+    },
+
+    /** camera court metres -> drawn court metres (and back: the turn is its own inverse) */
+    view(p) {
+        if (!this.flipped()) return p;
+
+        return { ...p, x: 9 - p.x, y: 18 - p.y, f: p.f === null || p.f === undefined ? p.f : (p.f + 180) % 360 };
     },
 
     destroy() {
@@ -251,8 +279,8 @@ export default (config) => ({
         pt.y = evt.clientY;
         const p = pt.matrixTransform(svg.getScreenCTM().inverse());
 
-        // screen -> court
-        return { x: p.y, y: p.x };
+        // screen -> drawn court -> camera court
+        return this.view({ x: p.y, y: p.x });
     },
 
     /** camera court frame <-> our team's frame (x as we face the net, y 0 = our end line) */
@@ -271,7 +299,8 @@ export default (config) => ({
         if (!layer) return;
 
         const seen = new Set();
-        this.dots.forEach((p, i) => {
+        this.dots.map((p) => this.view(p)).forEach((p, i) => {
+            if (p.team === 'them' && !this.showThem) return;
             const key = p.key ?? (p.k !== null && p.k !== undefined ? `k${p.k}` : `i${i}`);
             seen.add(key);
             let g = this.els.get(key);
@@ -358,7 +387,7 @@ export default (config) => ({
         const t = a.t ?? this.t ?? 0;
         const points = [['from', a.from], ['to', a.to]].filter(([, v]) => v);
         const screen = points.map(([w, v]) => {
-            const c = this.fromTeam(v[0], v[1], t);
+            const c = this.view(this.fromTeam(v[0], v[1], t));
 
             return [w, c.y, c.x];
         });
@@ -380,7 +409,7 @@ export default (config) => ({
 
         // pass target of the receiving team, with the 1 m circle (reception "#")
         if (a.skill === 'reception') {
-            const c = this.fromTeam(6, 8, t);
+            const c = this.view(this.fromTeam(6, 8, t));
             const ring = document.createElementNS(SVG, 'circle');
             ring.setAttribute('cx', c.y); ring.setAttribute('cy', c.x); ring.setAttribute('r', '1');
             ring.classList.add('court-target');

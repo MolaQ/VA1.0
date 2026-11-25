@@ -27,6 +27,12 @@
         <span class="text-xs text-muted" x-show="status() === 'none'">{{ __('No player positions for this moment yet.') }}</span>
         <span class="text-xs text-muted" x-show="status() === 'ai'">{{ __('Positions from the AI analysis.') }}</span>
         <div class="ml-auto flex items-center gap-1.5">
+            <button type="button" x-show="mode === 'live'" x-on:click="toggleThem()" :class="showThem ? 'bg-surface-3 text-fg' : 'bg-surface-2 text-muted hover:bg-surface-3'" class="rounded-lg px-2 py-1 text-xs font-semibold">
+                {{ __('Opponents') }}
+            </button>
+            <button type="button" x-on:click="toggleUsLeft()" :class="usLeft ? 'bg-brand-500/15 text-brand-400' : 'bg-surface-2 hover:bg-surface-3'" class="rounded-lg px-2 py-1 text-xs font-semibold" title="{{ __('Teams change ends every set: keep our team on the left') }}">
+                {{ __('Us on the left') }}
+            </button>
             @if ($canCode)
                 <button type="button" x-on:click="toggleSide()" class="rounded-lg bg-surface-2 px-2 py-1 text-xs font-semibold hover:bg-surface-3" title="{{ __('Which half of the picture we play on in this set') }}">
                     {{ __('Swap sides') }} ⇄
@@ -54,8 +60,8 @@
         @foreach ($zones as [$zx, $zy, $z])
             <text x="{{ $zx }}" y="{{ $zy }}" text-anchor="middle" dominant-baseline="central" font-size="0.9" class="court-zone">{{ $z }}</text>
         @endforeach
-        <text x="4.5" y="10.45" text-anchor="middle" font-size="0.55" class="court-side" x-text="ourSide(t ?? 0) === 'near' ? @js(__('Us')) : @js(__('Opponent'))"></text>
-        <text x="13.5" y="10.45" text-anchor="middle" font-size="0.55" class="court-side" x-text="ourSide(t ?? 0) === 'near' ? @js(__('Opponent')) : @js(__('Us'))"></text>
+        <text x="4.5" y="10.45" text-anchor="middle" font-size="0.55" class="court-side" x-text="usLeft || ourSide(t ?? 0) === 'near' ? @js(__('Us')) : @js(__('Opponent'))"></text>
+        <text x="13.5" y="10.45" text-anchor="middle" font-size="0.55" class="court-side" x-text="usLeft || ourSide(t ?? 0) === 'near' ? @js(__('Opponent')) : @js(__('Us'))"></text>
         <g x-ref="ball"></g>
         <g x-ref="dots"></g>
     </svg>

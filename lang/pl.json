@@ -606,5 +606,8 @@
     "Done": "Gotowe",
     "The grade records the touch. The form stays open for the next one.": "Ocena od razu zapisuje zagranie. Formularz zostaje otwarty na następne.",
     "Last coded in set :set": "Ostatnio zakodowane w secie :set",
-    "Wrong touch? Pencil: every change is saved at once.": "Pomyłka? Ołówek: każda zmiana zapisuje się od razu."
+    "Wrong touch? Pencil: every change is saved at once.": "Pomyłka? Ołówek: każda zmiana zapisuje się od razu.",
+    "Us on the left": "Nasi z lewej",
+    "Teams change ends every set: keep our team on the left": "Drużyny zmieniają strony co set: nasza drużyna zawsze po lewej",
+    "Opponents": "Rywale"
 }
