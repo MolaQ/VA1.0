@@ -93,6 +93,18 @@ def match_zones(players: list[tuple[float, float]], serving: bool) -> dict[int, 
     return best
 
 
+def at_serve(tracking: Tracking, t: float, before: float = 1.5, after: float = 0.3) -> list[Seen]:
+    """Everyone seen around the serve: players stand still then, so a player missing from the
+    sample nearest to the serve is taken from a sample a moment earlier (each track once)."""
+    best: dict[int, tuple[float, Seen]] = {}
+    for st, seen in tracking.samples:
+        if t - before <= st <= t + after:
+            for s in seen:
+                if s.track not in best or abs(st - t) < best[s.track][0]:
+                    best[s.track] = (abs(st - t), s)
+    return [s for _, s in best.values()]
+
+
 def rotation_votes(rallies: list[Rally], tracking: Tracking, lineups: dict[int, list[int | None]],
                    our_side_set1: str, liberos: dict[int, tuple[int | None, int | None]] | None = None,
                    middles: set[int] | None = None, why: dict[str, int] | None = None) -> int:
@@ -117,7 +129,7 @@ def rotation_votes(rallies: list[Rally], tracking: Tracking, lineups: dict[int, 
             continue
         half = our_half(r.set, our_side_set1)
         # our half, including the server behind our end line
-        ours: list[Seen] = [s for s in tracking.at(r.start) if (s.y < 9) == (half == "near")]
+        ours: list[Seen] = [s for s in at_serve(tracking, r.start) if (s.y < 9) == (half == "near")]
         serving = r.server == "us"
         if not 5 <= len(ours) <= 7:
             skip(f"players_{min(len(ours), 8)}" if len(ours) < 8 else "players_8+")
