@@ -234,9 +234,10 @@ export default (config) => ({
     decorate(p) {
         const label = p.k !== null && p.k !== undefined ? this.labels[p.k] : null;
 
+        // the analyst's correction wins over the AI number (also when it clears the number)
         return {
             ...p,
-            n: p.n ?? label?.n ?? null,
+            n: label ? (label.n ?? null) : (p.n ?? null),
             team: label?.team ?? p.team ?? 'us',
         };
     },
