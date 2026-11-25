@@ -257,6 +257,7 @@ class Job:
         candidates = ral.trim_with_whistles(candidates, self.whistles)
         scores = stabilise(self.readings, self.cal, s)
         rallies, sets = ral.build(candidates, scores, s, self.cal.our_side_set1, self.first_serve)
+        self.diag: dict = {}
         numbered = ral.assign_servers(rallies, self.lineups)
         tracking = self.tracking(spans)
         rotation_matches = looks_matched = 0
@@ -266,7 +267,8 @@ class Job:
                     tracking.vote(track, n, 1.0)
         if tracking is not None and self.lineups:
             from .rotation import rotation_votes
-            rotation_matches = rotation_votes(rallies, tracking, self.lineups, self.cal.our_side_set1, self.liberos, self.middles)
+            rotation_matches = rotation_votes(rallies, tracking, self.lineups, self.cal.our_side_set1, self.liberos,
+                                              self.middles, why=self.diag.setdefault("rotation_skipped", {}))
         reid_matched = model_matched = 0
         if tracking is not None:
             ours = self._ours(tracking, sets)
@@ -306,6 +308,7 @@ class Job:
                 "reid_matched": reid_matched,
                 "model_matched": model_matched,
                 "receptions": len(receptions),
+                "diagnostics": self.diag,
                 "serves_with_point": len(serve_extra),
             },
         }
@@ -348,7 +351,9 @@ class Job:
         prints = reid.track_fingerprints(tracking, self.prints)
         mine = {k: n for k, n in tracking.numbers.items() if k in ours and (not self.roster or n in self.roster)}
         known = reid.learn(prints, mine, self.gallery)
-        matched = reid.reid_votes(tracking, prints, known, self.roster or None, ours)
+        d = self.diag.setdefault("reid", {})
+        d.update(our_tracks=len(ours), our_numbered=len(mine), with_print=len(prints))
+        matched = reid.reid_votes(tracking, prints, known, self.roster or None, ours, d)
         self.learned_prints = known
         return matched
 
@@ -361,6 +366,7 @@ class Job:
         looks = appearance.track_looks(tracking, h)
         mine = {k: n for k, n in tracking.numbers.items() if k in ours and (not self.roster or n in self.roster)}
         known = appearance.learn(looks, mine, self.looks)
+        self.diag["looks"] = {"with_look": len(looks), "our_numbered": len(mine), "known": len(known)}
         matched = appearance.appearance_votes(tracking, looks, known, self.roster or None, ours)
         self.learned = known  # learned only from numbers that did not come from the looks themselves
         return matched
