@@ -95,3 +95,47 @@ def test_jersey_numbers_are_agreed_per_track():
     frames = build_frames(samples, h, [(1, 0.0)], tracking=tracking)
     numbers = {round(p["y"]): p["n"] for p in frames[-1]["players"]}
     assert numbers == {4: 7, 12: None}  # #11 was only read with low confidence
+
+
+def _tracking(pieces):
+    """pieces: track id -> list of (t, x, y)."""
+    from vva_analyzer.players import Seen, Track, Tracking
+
+    by_t: dict = {}
+    for k, pts in pieces.items():
+        for t, x, y in pts:
+            by_t.setdefault(t, []).append(Seen(k, x, y, None, None))
+    tracks = {k: Track(k, pts[-1][1], pts[-1][2], pts[-1][0]) for k, pts in pieces.items()}
+    return Tracking(sorted(by_t.items()), {}, tracks)
+
+
+def test_stitch_joins_a_piece_after_a_short_gap():
+    from vva_analyzer.players import stitch
+
+    tr = _tracking({1: [(0.0, 2, 3), (0.5, 2.2, 3)], 2: [(2.0, 2.5, 3.2), (2.5, 2.6, 3.2)],
+                    3: [(0.0, 6, 3), (2.5, 6, 3)]})
+    tr.tracks[1].votes, tr.tracks[1].reads = {7: 0.6}, {7: 1}
+    tr.tracks[2].votes, tr.tracks[2].reads = {7: 0.6}, {7: 1}
+    assert stitch(tr) == 1
+    assert [s.track for _, seen in tr.samples for s in seen if s.x < 4] == [1, 1, 1, 1]
+    assert 2 not in tr.tracks and tr.numbers == {1: 7}  # two reads together name the player
+
+
+def test_stitch_keeps_apart_far_pieces_other_half_and_other_looks():
+    from vva_analyzer.players import stitch
+
+    # too far for the gap
+    assert stitch(_tracking({1: [(0.0, 1, 3)], 2: [(1.0, 8, 3)]})) == 0
+    # other half of the court
+    assert stitch(_tracking({1: [(0.0, 4, 8.5)], 2: [(1.0, 4, 9.5)]})) == 0
+    # close, but the fingerprints differ
+    assert stitch(_tracking({1: [(0.0, 4, 3)], 2: [(1.0, 4, 3)]}), {1: [1.0, 0.0], 2: [0.0, 1.0]}) == 0
+    assert stitch(_tracking({1: [(0.0, 4, 3)], 2: [(1.0, 4, 3)]}), {1: [1.0, 0.0], 2: [0.9, 0.436]}) == 1
+
+
+def test_stitch_chains_and_picks_the_closest():
+    from vva_analyzer.players import stitch
+
+    tr = _tracking({1: [(0.0, 4, 3)], 2: [(1.0, 4.2, 3)], 3: [(2.0, 4.3, 3)], 4: [(1.0, 5.5, 3)]})
+    assert stitch(tr) == 2  # 1 -> 2 -> 3; 4 started next to 2 but 2 is closer to 1
+    assert {s.track for _, seen in tr.samples for s in seen} == {1, 4}

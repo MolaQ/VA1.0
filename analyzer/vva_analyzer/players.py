@@ -263,6 +263,17 @@ class Tracking:
         else:
             self.numbers[track] = n
 
+    def around(self, t: float, within: float = 0.6) -> list[tuple[float, list[Seen]]]:
+        """The samples just before and just after t (each within `within` seconds), with their times."""
+        before = after = None
+        for st, seen in self.samples:
+            if st <= t and t - st <= within:
+                before = (st, seen)
+            elif st > t and st - t <= within:
+                after = (st, seen)
+                break
+        return [x for x in (before, after) if x is not None]
+
     def at(self, t: float, within: float = 0.6) -> list[Seen]:
         """Players at the sample nearest to t."""
         best, gap = [], within
@@ -331,3 +342,89 @@ def build_frames(
         }
         for t, seen in tracking.samples
     ]
+
+
+@dataclass
+class _Span:
+    track: int
+    t0: float
+    t1: float
+    first: tuple[float, float]
+    last: tuple[float, float]
+    n: int
+
+
+def stitch(tracking: Tracking, prints: dict[int, list[float]] | None = None, max_gap: float = 4.0,
+           min_sim: float = 0.6, speed: float = 3.5, slack: float = 1.5) -> int:
+    """Join track pieces of one player: a track that ends, and another that starts soon after
+    near the same spot on the same half (and, when known, with a similar re-ID fingerprint).
+
+    The later piece takes the id of the earlier one (so the ids are stable between runs and
+    the analyst's corrections keep pointing at the same dots); its votes are added. Returns how
+    many pieces were joined."""
+    import bisect
+
+    spans: dict[int, _Span] = {}
+    for t, seen in tracking.samples:
+        for s in seen:
+            sp = spans.get(s.track)
+            if sp is None:
+                spans[s.track] = _Span(s.track, t, t, (s.x, s.y), (s.x, s.y), 1)
+            else:
+                sp.t1, sp.last, sp.n = t, (s.x, s.y), sp.n + 1
+    vec = {k: np.asarray(v, dtype=np.float32) for k, v in (prints or {}).items()}
+
+    def cost(a: _Span, b: _Span) -> float | None:
+        gap = b.t0 - a.t1
+        if gap <= 0 or gap > max_gap:
+            return None
+        if (a.last[1] < NET_Y) != (b.first[1] < NET_Y):
+            return None  # players don't change halves during play
+        d = math.hypot(b.first[0] - a.last[0], b.first[1] - a.last[1])
+        if d > speed * gap + slack:
+            return None
+        c = d / (speed * gap + slack) + gap / max_gap
+        if a.track in vec and b.track in vec:
+            sim = float(vec[a.track] @ vec[b.track])
+            if sim < min_sim:
+                return None
+            c += 2 * (1 - sim)
+        return c
+
+    pairs = []
+    by_end = sorted(spans.values(), key=lambda s: s.t1)
+    ends = [s.t1 for s in by_end]
+    for b in spans.values():
+        # only pieces that ended shortly before b started
+        for a in by_end[bisect.bisect_left(ends, b.t0 - max_gap):bisect.bisect_left(ends, b.t0)]:
+            if a.track != b.track and (c := cost(a, b)) is not None:
+                pairs.append((c, a.track, b.track))
+    pairs.sort()
+    succ: dict[int, int] = {}
+    pred: dict[int, int] = {}
+    for _, a, b in pairs:
+        if a in succ or b in pred:
+            continue
+        succ[a], pred[b] = b, a
+    if not pred:
+        return 0
+
+    def root(k: int) -> int:
+        while k in pred:
+            k = pred[k]
+        return k
+
+    # each piece has at most one follower and starts after its predecessor ended: chains never overlap
+    new = {k: root(k) for k in pred}
+    for _, seen in tracking.samples:
+        for s in seen:
+            if s.track in new:
+                s.track = new[s.track]
+    for k, r in new.items():
+        src, dst = tracking.tracks.pop(k, None), tracking.tracks.get(r)
+        if src is not None and dst is not None:
+            for n, v in src.votes.items():
+                dst.votes[n] = dst.votes.get(n, 0.0) + v
+                dst.reads[n] = dst.reads.get(n, 0) + src.reads.get(n, 0)
+    tracking.numbers = {k: n for k, tr in tracking.tracks.items() if (n := tr.number()) is not None}
+    return len(new)
